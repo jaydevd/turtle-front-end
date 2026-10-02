@@ -22,7 +22,7 @@ import { Surface, HabitIconTile } from '@/components/ui/surfaces';
 import { StatusPill, TagChip } from '@/components/ui/pills';
 import { CheckInControl, type CheckInLog } from './CheckInControl';
 import { describeSchedule, dailyTarget, isScheduledOn } from '@/lib/schedule';
-import { formatClock, formatPlural, startOfTodayUtc } from '@/lib/date';
+import { formatClock, formatPlural, startOfToday } from '@/lib/date';
 import { useAppScheme } from '@/theme/useAppScheme';
 import { radii } from '@/theme/tokens';
 import { tabularNums } from '@/theme/typography';
@@ -41,7 +41,7 @@ export function HabitCard({ habit, stat, todayLog, onTagClick, onDelete }: Habit
   const { colors, accentFor } = useAppScheme();
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const accent = accentFor(habit.color);
-  const dueToday = stat ? stat.due_today : isScheduledOn(habit.schedule, startOfTodayUtc());
+  const dueToday = stat ? stat.due_today : isScheduledOn(habit.schedule, startOfToday());
 
   return (
     <Surface sx={{ position: 'relative', overflow: 'hidden' }}>

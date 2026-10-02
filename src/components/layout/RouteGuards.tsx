@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
-import Box from '@mui/material/Box';
-import CircularProgress from '@mui/material/CircularProgress';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { useAppScheme } from '@/theme/useAppScheme';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import { useRouter } from 'next/navigation';
+import { useEffect, type ReactNode } from 'react';
 
 /**
  * Blocks a protected screen until the stored session is known, then redirects
@@ -19,7 +19,8 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (status === 'anonymous') {
-      router.replace('/login');
+      const destination = `${window.location.pathname}${window.location.search}`;
+      router.replace(`/login?next=${encodeURIComponent(destination)}`);
     }
   }, [status, router]);
 
@@ -48,7 +49,11 @@ export function RedirectIfAuthenticated({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (status === 'authenticated') {
-      router.replace('/dashboard');
+      const requested = new URLSearchParams(window.location.search).get('next');
+      const destination = requested?.startsWith('/') && !requested.startsWith('//')
+        ? requested
+        : '/dashboard';
+      router.replace(destination);
     }
   }, [status, router]);
 

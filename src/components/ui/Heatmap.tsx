@@ -2,7 +2,7 @@
 
 import { Box, Stack, Tooltip, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { addUtcDays, formatWeekday, startOfTodayUtc, utcWeekday } from '@/lib/date';
+import { addUtcDays, formatWeekday, startOfToday, dayLabelWeekday } from '@/lib/date';
 import { radii } from '@/theme/tokens';
 import { useAppScheme } from '@/theme/useAppScheme';
 import { statusLabels } from './pills';
@@ -28,7 +28,7 @@ export function Heatmap({
   logsByDate,
   days = 14,
   accent,
-  today = startOfTodayUtc(),
+  today = startOfToday(),
   showLabels = true,
   size = 26,
 }: HeatmapProps) {
@@ -43,7 +43,7 @@ export function Heatmap({
           const log = logsByDate.get(day);
           const isToday = day === today;
           const background = cellBackground(log?.status, accent, colors.hairline);
-          const weekday = utcWeekday(day);
+          const weekday = dayLabelWeekday(day);
           const isWeekend = weekday >= 5;
 
           return (

@@ -21,7 +21,7 @@ import MoreVertRounded from '@mui/icons-material/MoreVertRounded';
 import LocalFireDepartmentRounded from '@mui/icons-material/LocalFireDepartmentRounded';
 import EmojiEventsRounded from '@mui/icons-material/EmojiEventsRounded';
 import TaskAltRounded from '@mui/icons-material/TaskAltRounded';
-import InsightsRounded from '@mui/icons-material/InsightsRounded';
+import InsightsOutlined from '@mui/icons-material/InsightsOutlined';
 import HistoryRounded from '@mui/icons-material/HistoryRounded';
 import {
   ErrorState,
@@ -56,7 +56,7 @@ import {
   formatLongDate,
   formatShortDate,
   logsByUtcDay,
-  startOfTodayUtc,
+  startOfToday,
 } from '@/lib/date';
 import { dailyTarget, describeSchedule, describeWeekdaysLong } from '@/lib/schedule';
 import { useAppScheme } from '@/theme/useAppScheme';
@@ -76,7 +76,7 @@ export function HabitDetailView({ habitId }: { habitId: string }) {
   const removeLog = useDeleteLog();
   const upsertLog = useUpsertLog();
 
-  const today = startOfTodayUtc();
+  const today = startOfToday();
   const logsQuery = useHabitLogs(habitId, addUtcDays(today, -HISTORY_WINDOW), addUtcDays(today, 1));
   const logs = useMemo(() => logsQuery.data?.results ?? [], [logsQuery.data]);
   const logsByDay = useMemo(() => logsByUtcDay(logs), [logs]);
@@ -178,6 +178,9 @@ export function HabitDetailView({ habitId }: { habitId: string }) {
             </Stack>
           </Box>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <Button component={Link} href={`/habits/${habitId}/analysis`} variant="outlined" startIcon={<InsightsOutlined />}>
+              Analysis
+            </Button>
             <Button component={Link} href={`/habits/${habitId}/edit`} variant="outlined" startIcon={<EditOutlined />}>
               Edit
             </Button>
@@ -228,7 +231,7 @@ export function HabitDetailView({ habitId }: { habitId: string }) {
               label="30-day rate"
               value={`${Math.round(stat?.completion_rate ?? 0)}%`}
               hint={`${stat?.scheduled_days ?? 0} scheduled days`}
-              icon={InsightsRounded}
+              icon={InsightsOutlined}
             />
           </>
         )}

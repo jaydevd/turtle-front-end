@@ -23,6 +23,13 @@ import { useState } from 'react';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function authenticatedDestination(): string {
+  const requested = new URLSearchParams(window.location.search).get('next');
+  return requested?.startsWith('/') && !requested.startsWith('//')
+    ? requested
+    : '/dashboard';
+}
+
 function validateEmail(email: string): string | undefined {
   if (!email.trim()) return 'Enter your email address.';
   if (!EMAIL_PATTERN.test(email.trim())) return 'Enter a valid email address.';
@@ -144,7 +151,7 @@ export function LoginView() {
     setSubmitting(true);
     try {
       await signIn(email, password);
-      router.replace('/dashboard');
+      router.replace(authenticatedDestination());
     } catch (caught) {
       setError(caught);
     } finally {
@@ -163,6 +170,13 @@ export function LoginView() {
           <Typography
             component={Link}
             href="/signup"
+            onClick={(event) => {
+              const next = new URLSearchParams(window.location.search).get('next');
+              if (next) {
+                event.preventDefault();
+                router.push(`/signup?next=${encodeURIComponent(next)}`);
+              }
+            }}
             variant="body2"
             sx={{ color: 'primary.dark', fontWeight: 600 }}
           >
@@ -253,7 +267,7 @@ export function SignUpView() {
     setSubmitting(true);
     try {
       await signUp({ email, password, first_name: firstName, last_name: lastName });
-      router.replace('/dashboard');
+      router.replace(authenticatedDestination());
     } catch (caught) {
       setError(caught);
     } finally {
@@ -276,6 +290,13 @@ export function SignUpView() {
           <Typography
             component={Link}
             href="/login"
+            onClick={(event) => {
+              const next = new URLSearchParams(window.location.search).get('next');
+              if (next) {
+                event.preventDefault();
+                router.push(`/login?next=${encodeURIComponent(next)}`);
+              }
+            }}
             variant="body2"
             sx={{ color: 'primary.dark', fontWeight: 600 }}
           >

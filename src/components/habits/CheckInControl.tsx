@@ -24,7 +24,7 @@ import { useToast } from '@/components/feedback/ToastProvider';
 import { errorMessage } from '@/lib/api/client';
 import { useDeleteLog, useUpsertLog } from '@/lib/query/hooks';
 import { statusLabels } from '@/components/ui/pills';
-import { startOfTodayUtc } from '@/lib/date';
+import { startOfToday } from '@/lib/date';
 import { useAppScheme } from '@/theme/useAppScheme';
 import { radii } from '@/theme/tokens';
 import type { HabitStatus } from '@/types/api';
@@ -81,7 +81,7 @@ export function CheckInControl({
     try {
       await upsert.mutateAsync({
         habit: habitId,
-        date: startOfTodayUtc(),
+        date: startOfToday(),
         status: next,
         completed_count: next === 'COMPLETED' ? target : next === 'PARTIAL' ? 1 : 0,
         note: log?.note ?? '',
@@ -112,7 +112,7 @@ export function CheckInControl({
     try {
       await upsert.mutateAsync({
         habit: habitId,
-        date: startOfTodayUtc(),
+        date: startOfToday(),
         status: status ?? 'COMPLETED',
         completed_count: log?.completed_count ?? target,
         note: note.trim(),

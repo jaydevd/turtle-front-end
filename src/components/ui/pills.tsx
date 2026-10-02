@@ -5,7 +5,13 @@ import { alpha } from '@mui/material/styles';
 import type { Theme } from '@mui/material/styles';
 import { radii } from '@/theme/tokens';
 import { useAppScheme } from '@/theme/useAppScheme';
-import type { HabitStatus } from '@/types/api';
+import type {
+  ChallengeStatus,
+  GroupRole,
+  HabitStatus,
+  InvitationStatus,
+  JoinRequestStatus,
+} from '@/types/api';
 
 export const statusLabels: Record<HabitStatus, string> = {
   ACTIVE: 'Active',
@@ -78,7 +84,6 @@ export interface TagChipProps {
   onClick?: () => void;
   active?: boolean;
 }
-
 export function TagChip({ name, count, color, onClick, active = false }: TagChipProps) {
   const { colors } = useAppScheme();
   const interactive = typeof onClick === 'function';
@@ -169,5 +174,148 @@ export function Dot({ color, size = 8 }: { color: string; size?: number }) {
         flexShrink: 0,
       }}
     />
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Group and challenge meta                                            */
+/* ------------------------------------------------------------------ */
+
+export const groupRoleLabels: Record<GroupRole, string> = {
+  owner: 'Owner',
+  admin: 'Admin',
+  member: 'Member',
+};
+
+export const joinRequestStatusLabels: Record<JoinRequestStatus, string> = {
+  pending: 'Pending',
+  accepted: 'Accepted',
+  rejected: 'Rejected',
+  cancelled: 'Withdrawn',
+};
+
+export const invitationStatusLabels: Record<InvitationStatus, string> = {
+  pending: 'Pending',
+  accepted: 'Accepted',
+  expired: 'Expired',
+  revoked: 'Revoked',
+};
+
+export const challengeStatusLabels: Record<ChallengeStatus, string> = {
+  draft: 'Draft',
+  active: 'Running',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+};
+
+type MetaTone = 'info' | 'success' | 'warning' | 'error' | 'primary' | 'default';
+
+/**
+ * The shared pill behind every group and challenge badge.
+ *
+ * `default` deliberately falls back to text colour rather than a palette slot: a
+ * withdrawn request and a cancelled challenge are settled, not failing, and
+ * painting them red would read as an error the user has to fix.
+ */
+function MetaPill({ label, tone, size = 'small' }: { label: string; tone: MetaTone; size?: 'small' | 'medium' }) {
+  const small = size === 'small';
+
+  return (
+    <Box
+      component="span"
+      sx={(t: Theme) => {
+        const base =
+          tone === 'default'
+            ? t.palette.text.secondary
+            : tone === 'primary'
+              ? t.palette.primary.main
+              : t.palette[tone].main;
+        return {
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 0.75,
+          height: small ? 22 : 28,
+          px: small ? 1 : 1.5,
+          borderRadius: radii.pill,
+          backgroundColor: alpha(base, 0.12),
+          color: base,
+          fontWeight: 700,
+          fontSize: small ? '0.6875rem' : '0.75rem',
+          lineHeight: 1,
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
+        };
+      }}
+    >
+      {label}
+    </Box>
+  );
+}
+
+const roleTones: Record<GroupRole, MetaTone> = {
+  owner: 'primary',
+  admin: 'info',
+  member: 'default',
+};
+
+const joinRequestTones: Record<JoinRequestStatus, MetaTone> = {
+  pending: 'warning',
+  accepted: 'success',
+  rejected: 'error',
+  cancelled: 'default',
+};
+
+const invitationTones: Record<InvitationStatus, MetaTone> = {
+  pending: 'info',
+  accepted: 'success',
+  expired: 'default',
+  revoked: 'default',
+};
+
+const challengeTones: Record<ChallengeStatus, MetaTone> = {
+  draft: 'default',
+  active: 'info',
+  completed: 'success',
+  cancelled: 'warning',
+};
+
+export function RolePill({ role, size }: { role: GroupRole; size?: 'small' | 'medium' }) {
+  return <MetaPill label={groupRoleLabels[role]} tone={roleTones[role]} size={size} />;
+}
+
+export function JoinRequestStatusPill({
+  status,
+  size,
+}: {
+  status: JoinRequestStatus;
+  size?: 'small' | 'medium';
+}) {
+  return (
+    <MetaPill label={joinRequestStatusLabels[status]} tone={joinRequestTones[status]} size={size} />
+  );
+}
+
+export function InvitationStatusPill({
+  status,
+  size,
+}: {
+  status: InvitationStatus;
+  size?: 'small' | 'medium';
+}) {
+  return (
+    <MetaPill label={invitationStatusLabels[status]} tone={invitationTones[status]} size={size} />
+  );
+}
+
+export function ChallengeStatusPill({
+  status,
+  size,
+}: {
+  status: ChallengeStatus | null;
+  size?: 'small' | 'medium';
+}) {
+  const resolved = status ?? 'draft';
+  return (
+    <MetaPill label={challengeStatusLabels[resolved]} tone={challengeTones[resolved]} size={size} />
   );
 }

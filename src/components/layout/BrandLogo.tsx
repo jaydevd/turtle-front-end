@@ -7,11 +7,12 @@ import Image from 'next/image';
 interface BrandLogoProps {
   size?: number;
   showName?: boolean;
+  darkModeShadow?: boolean;
 }
 
-export function BrandLogo({ size = 34, showName = true }: BrandLogoProps) {
+export function BrandLogo({ size = 40, showName = true, darkModeShadow = false }: BrandLogoProps) {
   const { mode } = useAppScheme();
-  const logoSource = mode === 'dark' ? '/brand/logo-light.png' : '/brand/logo-dark.png';
+  const logoSource = mode === 'dark' ? '/brand/logo.png' : '/brand/logo.png';
 
   return (
     <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
@@ -24,7 +25,7 @@ export function BrandLogo({ size = 34, showName = true }: BrandLogoProps) {
           height: size,
           flexShrink: 0,
           overflow: 'hidden',
-          borderRadius: '5px',
+          borderRadius: '6px'
         }}
       >
         <Image
@@ -32,7 +33,13 @@ export function BrandLogo({ size = 34, showName = true }: BrandLogoProps) {
           alt={showName ? '' : 'Habit Tracker'}
           fill
           sizes={`${size}px`}
-          style={{ objectFit: 'contain' }}
+          style={{
+            objectFit: 'contain',
+            filter:
+              darkModeShadow && mode === 'dark'
+                ? 'drop-shadow(0 0 2px rgba(255, 254, 254, 0.74))'
+                : 'none',
+          }}
           priority
         />
       </Box>
@@ -41,13 +48,13 @@ export function BrandLogo({ size = 34, showName = true }: BrandLogoProps) {
           component="span"
           sx={{
             fontFamily: 'var(--font-display)',
-            fontSize: '1.1875rem',
+            fontSize: '1.6rem',
+            letterSpacing: '-0.03rem',
             fontWeight: 600,
-            letterSpacing: '-0.01em',
             color: 'var(--mui-palette-text-primary)',
           }}
         >
-          Turtle
+          turtle
         </Typography>
       ) : null}
     </Stack>

@@ -9,27 +9,29 @@ import { useAppScheme } from '@/theme/useAppScheme';
 import AutoAwesomeRounded from '@mui/icons-material/AutoAwesomeRounded';
 import DarkModeOutlined from '@mui/icons-material/DarkModeOutlined';
 import DashboardRounded from '@mui/icons-material/DashboardRounded';
+import GroupsOutlined from '@mui/icons-material/GroupsOutlined';
+import InsightsOutlined from '@mui/icons-material/InsightsOutlined';
 import LightModeOutlined from '@mui/icons-material/LightModeOutlined';
 import LocalOfferOutlined from '@mui/icons-material/LocalOfferOutlined';
 import LogoutRounded from '@mui/icons-material/LogoutRounded';
 import MenuRounded from '@mui/icons-material/MenuRounded';
 import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
 import {
-  Avatar,
-  Box,
-  Divider,
-  Drawer,
-  IconButton,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Menu,
-  MenuItem,
-  Stack,
-  Tooltip,
-  Typography,
-  useMediaQuery,
+    Avatar,
+    Box,
+    Divider,
+    Drawer,
+    IconButton,
+    List,
+    ListItemButton,
+    ListItemIcon,
+    ListItemText,
+    Menu,
+    MenuItem,
+    Stack,
+    Tooltip,
+    Typography,
+    useMediaQuery,
 } from '@mui/material';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -38,7 +40,9 @@ import { useState, type ReactNode } from 'react';
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: DashboardRounded },
   { href: '/habits', label: 'Habits', icon: AutoAwesomeRounded },
+  { href: '/groups', label: 'Groups', icon: GroupsOutlined },
   { href: '/tags', label: 'Tags', icon: LocalOfferOutlined },
+  { href: '/insights', label: 'Insights', icon: InsightsOutlined },
   { href: '/settings', label: 'Settings', icon: SettingsOutlined },
 ] as const;
 
@@ -199,7 +203,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const sidebar = (
     <Stack sx={{ height: '100%', py: 2.5 }}>
       <Box sx={{ px: 2.5, pb: 3 }}>
-        <BrandLogo />
+        <BrandLogo darkModeShadow />
       </Box>
       <NavList onNavigate={() => setMobileOpen(false)} />
       <Box sx={{ flexGrow: 1 }} />

@@ -98,15 +98,15 @@ export interface PageHeaderProps {
 export function PageHeader({ eyebrow, title, description, actions }: PageHeaderProps) {
   return (
     <Stack
-      direction={{ xs: 'column', sm: 'row' }}
+      direction={{ xs: 'column', md: 'row' }}
       spacing={2}
       sx={{
         mb: { xs: 3, md: 4 },
-        alignItems: { xs: 'stretch', sm: 'flex-end' },
+        alignItems: { xs: 'stretch', md: 'flex-end' },
         justifyContent: 'space-between',
       }}
     >
-      <Box sx={{ minWidth: 0 }}>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
         {eyebrow ? (
           <Typography variant="overline" sx={{ color: 'primary.main', display: 'block', mb: 0.75 }}>
             {eyebrow}
@@ -126,7 +126,18 @@ export function PageHeader({ eyebrow, title, description, actions }: PageHeaderP
         ) : null}
       </Box>
       {actions ? (
-        <Stack direction="row" spacing={1.25} sx={{ flexShrink: 0 }}>
+        <Stack
+          direction="row"
+          spacing={1.25}
+          sx={{
+            minWidth: 0,
+            maxWidth: '100%',
+            flexShrink: 1,
+            flexWrap: 'wrap',
+            justifyContent: { xs: 'flex-start', md: 'flex-end' },
+            rowGap: 1,
+          }}
+        >
           {actions}
         </Stack>
       ) : null}
@@ -144,12 +155,13 @@ export interface StatTileProps {
   hint?: string;
   icon?: SvgIconComponent;
   accent?: string;
+  compactValue?: boolean;
 }
 
-export function StatTile({ label, value, hint, icon: Icon, accent }: StatTileProps) {
+export function StatTile({ label, value, hint, icon: Icon, accent, compactValue = false }: StatTileProps) {
   const { colors } = useAppScheme();
   return (
-    <Surface sx={{ p: 2.5, height: '100%' }}>
+    <Surface sx={{ p: 2.5, height: '100%', minWidth: 0 }}>
       <Stack direction="row" spacing={1} sx={{ mb: 1.75, alignItems: 'center' }}>
         {Icon ? (
           <Box
@@ -173,7 +185,13 @@ export function StatTile({ label, value, hint, icon: Icon, accent }: StatTilePro
       </Stack>
       <Typography
         variant="h2"
-        sx={{ fontSize: '2.1rem', lineHeight: 1.05, color: 'text.primary', ...tabularNums }}
+        sx={{
+          fontSize: compactValue ? { xs: '1.25rem', sm: '1.4rem', md: '1.5rem' } : '2.1rem',
+          lineHeight: compactValue ? 1.15 : 1.05,
+          color: 'text.primary',
+          ...(compactValue ? { overflowWrap: 'anywhere' } : {}),
+          ...tabularNums,
+        }}
       >
         {value}
       </Typography>

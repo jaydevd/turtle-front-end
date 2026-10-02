@@ -1,5 +1,7 @@
 import { api } from './client';
 import type {
+  ChallengeProgress,
+  ChallengeSubscription,
   DashboardResponse,
   Habit,
   HabitCreate,
@@ -57,6 +59,51 @@ export const habitsApi = {
   dashboard(signal?: AbortSignal): Promise<DashboardResponse> {
     return api.get<DashboardResponse>('/user/habits/dashboard/', undefined, signal);
   },
+
+  /* ---- Group challenge lifecycle ----
+   *
+   * These hang off the habit rather than off the group because a participant logs
+   * against their own copy of the challenge, not the template. The view routes
+   * both spellings back to the same challenge, so a copy's id works here too. */
+
+  /** Joins a challenge and hands the caller their own copy to log against. */
+  subscribeToChallenge(challengeId: string): Promise<ChallengeSubscription> {
+    return api.post<ChallengeSubscription>(`/user/habits/${challengeId}/subscribe/`);
+  },
+
+  /** Leaves a challenge and discards the caller's copy of it. */
+  unsubscribeFromChallenge(challengeId: string): Promise<void> {
+    return api.delete<void>(`/user/habits/${challengeId}/subscribe/`);
+  },
+
+  /** Everyone taking part, whether or not they are still logging. */
+  challengeSubscribers(challengeId: string, signal?: AbortSignal): Promise<Page<ChallengeSubscription>> {
+    return api.get<Page<ChallengeSubscription>>(
+      `/user/habits/${challengeId}/subscribers/`,
+      { limit: MAX_PAGE_SIZE },
+      signal,
+    );
+  },
+
+  /** The full leaderboard, with scoring evidence. Readable without subscribing. */
+  challengeProgress(challengeId: string, signal?: AbortSignal): Promise<ChallengeProgress> {
+    return api.get<ChallengeProgress>(`/user/habits/${challengeId}/progress/`, undefined, signal);
+  },
+
+  /** DRAFT to ACTIVE, by the author or a group admin. Manual on purpose. */
+  startChallenge(challengeId: string): Promise<Habit> {
+    return api.post<Habit>(`/user/habits/${challengeId}/start-challenge/`);
+  },
+
+  /** Closes a challenge early and announces its winner. */
+  endChallenge(challengeId: string): Promise<Habit> {
+    return api.post<Habit>(`/user/habits/${challengeId}/end-challenge/`);
+  },
+
+  /** Shuts a challenge down without a winner. */
+  cancelChallenge(challengeId: string): Promise<Habit> {
+    return api.post<Habit>(`/user/habits/${challengeId}/cancel-challenge/`);
+  },
 };
 
 export const logsApi = {
@@ -85,3 +132,6 @@ export const logsApi = {
 };
 
 export type { Habit, HabitLog, HabitStat };
+
+
+

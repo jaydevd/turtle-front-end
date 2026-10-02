@@ -8,7 +8,7 @@
  * `Weekday` integers (Monday = 0), matching the backend enum.
  */
 
-import { formatClock, utcWeekday } from '@/lib/date';
+import { formatClock, dayLabelWeekday } from '@/lib/date';
 import { weekdayLabels, weekdayLongLabels } from '@/theme/tokens';
 import type { FrequencyType, HabitSchedule, Weekday } from '@/types/api';
 
@@ -76,7 +76,7 @@ export function isScheduledOn(
 ): boolean {
   if (!schedule) return true;
   if (schedule.frequency_type === 'CUSTOM') {
-    return (schedule.weekdays ?? []).includes(utcWeekday(day) as Weekday);
+    return (schedule.weekdays ?? []).includes(dayLabelWeekday(day) as Weekday);
   }
   return true;
 }
