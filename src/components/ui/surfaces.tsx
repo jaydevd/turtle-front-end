@@ -88,14 +88,51 @@ export function Section({ index, title, description, children, action }: Section
   );
 }
 
+export interface SettingsSectionProps {
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}
+
+/**
+ * A settings block separated from its neighbours by space and a labelled
+ * heading rather than a card, so a whole rule set flows down one page without
+ * box after box. The heading matches the page eyebrow so the two read as one
+ * hierarchy.
+ */
+export function SettingsSection({ title, description, action, children }: SettingsSectionProps) {
+  const { colors } = useAppScheme();
+  return (
+    <Box component="section">
+      <Stack direction="row" spacing={2} sx={{ mb: 1.5, alignItems: 'flex-start' }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="overline" sx={{ color: colors.inkSoft, display: 'block' }}>
+            {title}
+          </Typography>
+          {description ? (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
+              {description}
+            </Typography>
+          ) : null}
+        </Box>
+        {action}
+      </Stack>
+      {children}
+    </Box>
+  );
+}
+
 export interface PageHeaderProps {
   eyebrow?: string;
   title: string;
   description?: string;
+  /** Nudges the description without disturbing the title's alignment. */
+  descriptionSx?: Record<string, unknown>;
   actions?: React.ReactNode;
 }
 
-export function PageHeader({ eyebrow, title, description, actions }: PageHeaderProps) {
+export function PageHeader({ eyebrow, title, description, descriptionSx, actions }: PageHeaderProps) {
   return (
     <Stack
       direction={{ xs: 'column', md: 'row' }}
@@ -119,7 +156,7 @@ export function PageHeader({ eyebrow, title, description, actions }: PageHeaderP
           <Typography
             variant="body1"
             color="text.secondary"
-            sx={{ mt: 1, maxWidth: 620 }}
+            sx={{ mt: 1, maxWidth: 620, ...descriptionSx }}
           >
             {description}
           </Typography>

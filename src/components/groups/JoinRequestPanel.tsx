@@ -64,7 +64,7 @@ export function JoinRequestPanel({
   const respond = useRespondToJoinRequest();
 
   const [sendOpen, setSendOpen] = useState(false);
-  const [userId, setUserId] = useState('');
+  const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [sendError, setSendError] = useState<unknown>(null);
   const [withdrawTarget, setWithdrawTarget] = useState<GroupJoinRequest | null>(null);
@@ -76,22 +76,21 @@ export function JoinRequestPanel({
 
   const canSend =
     group.my_role !== null &&
-    (isAdmin || group.members_can_invite) &&
-    group.join_requests_enabled;
+    (isAdmin || (group.join_requests_enabled && group.members_can_invite));
 
   async function submitRequest() {
-    const trimmedId = userId.trim();
-    if (!trimmedId) return;
+    const address = email.trim();
+    if (!address) return;
     setSendError(null);
     try {
       await sendRequest.mutateAsync({
         groupId: group.id,
-        input: { to_user: trimmedId, message },
+        input: { email: address, message },
       });
       toast({ tone: 'success', message: 'Request sent. They decide from here.' });
       setRequestLinkReady(true);
       setSendOpen(false);
-      setUserId('');
+      setEmail('');
       setMessage('');
       onScopeChange('outgoing');
     } catch (error) {
@@ -151,7 +150,8 @@ export function JoinRequestPanel({
             </Button>
           }
         >
-          Share the review link with the person you asked so they can respond.
+          They will find it in their own inbox under Groups. Copy the review link
+          too if you would rather send them straight to it.
         </Alert>
       ) : null}
 
@@ -172,9 +172,9 @@ export function JoinRequestPanel({
           </Button>
         ) : (
           <Typography variant="caption" sx={{ color: colors.inkSoft }}>
-            {group.join_requests_enabled
+            {group.join_requests_enabled && group.members_can_invite
               ? 'Only admins can ask people to join here.'
-              : 'This group does not take join requests.'}
+              : 'You cannot ask people to join here. An admin still can.'}
           </Typography>
         )}
       </Stack>
@@ -189,7 +189,7 @@ export function JoinRequestPanel({
           description={
             scope === 'incoming'
               ? 'When a member asks you to join a group, it lands here to accept or decline.'
-              : 'Ask a registered user to join by pasting their user id.'
+              : 'Ask a registered user to join by entering their email address.'
           }
         />
       ) : (
@@ -269,7 +269,7 @@ export function JoinRequestPanel({
         description="They get to accept or decline. Nothing is added to the group until they say yes."
         confirmLabel="Send request"
         busy={sendRequest.isPending}
-        disabled={!userId.trim()}
+        disabled={!email.trim()}
         onConfirm={submitRequest}
         onClose={() => {
           setSendOpen(false);
@@ -277,16 +277,17 @@ export function JoinRequestPanel({
         }}
       >
         <Stack spacing={2}>
-          {sendError && !fieldError('to_user') ? (
+          {sendError && !fieldError('email') ? (
             <Alert severity="error">{errorMessage(sendError, 'Could not send that request.')}</Alert>
           ) : null}
           <Field
-            label="User ID"
-            value={userId}
-            onChange={(event) => setUserId(event.target.value)}
-            errorText={fieldError('to_user')}
-            helperText="The person you are asking can copy theirs from Settings › Account."
-            placeholder="00000000-0000-0000-0000-000000000000"
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            errorText={fieldError('email')}
+            helperText="The address they registered with. They accept or decline from their own inbox."
+            placeholder="somebody@example.com"
             autoFocus
           />
           <Field

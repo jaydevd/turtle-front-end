@@ -1,11 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Box, Button, CircularProgress, Stack } from '@mui/material';
-import ArrowBackRounded from '@mui/icons-material/ArrowBackRounded';
+import { Box, CircularProgress, Stack } from '@mui/material';
 import { PageHeader, ErrorState } from '@/components/ui/surfaces';
+import { BackLink } from '@/components/ui/BackLink';
 import { HabitForm } from '@/components/habits/HabitForm';
 import { useToast } from '@/components/feedback/ToastProvider';
 import { useCreateHabit, useTags } from '@/lib/query/hooks';
@@ -31,17 +30,8 @@ export function NewHabitView() {
   }
 
   return (
-    <Box sx={{ maxWidth: 760, mx: 'auto' }}>
-      <Button
-        component={Link}
-        href="/habits"
-        color="inherit"
-        size="small"
-        startIcon={<ArrowBackRounded />}
-        sx={{ mb: 2 }}
-      >
-        Back to habits
-      </Button>
+    <Box sx={{ maxWidth: 760, mx: 'auto', pb: 10 }}>
+      <BackLink href="/habits">Back to habits</BackLink>
 
       <PageHeader
         eyebrow="New habit"

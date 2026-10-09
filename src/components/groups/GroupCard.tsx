@@ -73,7 +73,7 @@ export function GroupCard({ group }: GroupCardProps) {
       <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 0.75 }}>
         {group.join_requests_enabled ? null : (
           <Typography variant="caption" sx={{ color: colors.inkSoft }}>
-            Invite-only
+            Members cannot ask
           </Typography>
         )}
         {group.anyone_can_create_challenge ? (

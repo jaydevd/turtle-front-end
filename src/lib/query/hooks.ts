@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-query';
 import { habitsApi, logsApi } from '@/lib/api/habits';
 import { tagsApi } from '@/lib/api/tags';
+import { authApi, type SetPasswordInput } from '@/lib/api/auth';
 import { profileApi, type UpdateProfileInput } from '@/lib/api/profile';
 import { insightsApi } from '@/lib/api/insights';
 import {
@@ -261,6 +262,50 @@ export function useUpdateProfile() {
   });
 }
 
+/**
+ * Sets a password on the signed-in account. The backend answers with the
+ * refreshed user, so `has_password` lands in the cache and the Settings form
+ * takes itself out of the way on the next render.
+ */
+export function useSetPassword() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: SetPasswordInput) => authApi.setPassword(input),
+    onSuccess: (user) => {
+      queryClient.setQueryData(queryKeys.profile, user);
+    },
+  });
+}
+
+/**
+ * Mints the URL that starts connecting Google to the signed-in account. The
+ * caller navigates to it, so there is no onSuccess here: the flow leaves the
+ * page and comes back through the Google callback, which is what tells Settings
+ * the outcome.
+ */
+export function useGoogleLinkStart() {
+  return useMutation({
+    mutationFn: (next?: string) => authApi.googleLinkStart(next),
+  });
+}
+
+/**
+ * Unlinks Google. The backend answers with the refreshed user, so the profile
+ * cache learns the link is gone without a second call - as does the persisted
+ * copy the shell greets from, once the caller passes this user to `updateUser`.
+ */
+export function useDisconnectGoogle() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => authApi.googleDisconnect(),
+    onSuccess: (user) => {
+      queryClient.setQueryData(queryKeys.profile, user);
+    },
+  });
+}
+
 /* ------------------------------------------------------------------ */
 /* Insights / Analytics                                                */
 /* ------------------------------------------------------------------ */
@@ -338,6 +383,18 @@ export function useJoinRequests(groupId: string | undefined, scope?: JoinRequest
     queryKey: groupKeys.joinRequests(groupId ?? '', scope),
     queryFn: ({ signal }) => joinRequestsApi.list(groupId as string, scope, signal),
     enabled: Boolean(groupId),
+  });
+}
+
+/**
+ * The caller's own join requests, with no group id needed. This is what puts a
+ * request addressed to the caller on screen: they are not in the group list yet,
+ * so there is nowhere else for it to appear.
+ */
+export function useMyJoinRequests(scope?: JoinRequestScope) {
+  return useQuery({
+    queryKey: groupKeys.myJoinRequests(scope),
+    queryFn: ({ signal }) => joinRequestsApi.mine(scope, signal),
   });
 }
 
@@ -427,6 +484,23 @@ export function useUpdateGroup() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: GroupUpdate }) => groupsApi.update(id, input),
+    /**
+     * The policy switches write on contact, so the cache is patched up front to
+     * flip the control immediately; a failure rolls the previous group back.
+     */
+    onMutate: async ({ id, input }) => {
+      await queryClient.cancelQueries({ queryKey: groupKeys.detail(id) });
+      const previous = queryClient.getQueryData<Group>(groupKeys.detail(id));
+      if (previous) {
+        queryClient.setQueryData<Group>(groupKeys.detail(id), { ...previous, ...input });
+      }
+      return { previous };
+    },
+    onError: (_error, variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(groupKeys.detail(variables.id), context.previous);
+      }
+    },
     onSuccess: (group) => {
       void queryClient.invalidateQueries({ queryKey: groupKeys.all });
       void queryClient.setQueryData(groupKeys.detail(group.id), group);

@@ -18,9 +18,16 @@ import { InvitationStatusPill } from '@/components/ui/pills';
 import { GroupCard } from '@/components/groups/GroupCard';
 import { useToast } from '@/components/feedback/ToastProvider';
 import { errorMessage, isApiError } from '@/lib/api/client';
-import { useCreateGroup, useGroups, useMyInvitations } from '@/lib/query/hooks';
+import { formatRelative } from '@/lib/date';
+import {
+  useCreateGroup,
+  useGroups,
+  useMyInvitations,
+  useMyJoinRequests,
+  useRespondToJoinRequest,
+} from '@/lib/query/hooks';
 import { useAppScheme } from '@/theme/useAppScheme';
-import type { GroupCreate } from '@/types/api';
+import type { GroupCreate, GroupJoinRequest } from '@/types/api';
 
 export function GroupsView() {
   const { colors } = useAppScheme();
@@ -28,7 +35,9 @@ export function GroupsView() {
 
   const groups = useGroups();
   const invitations = useMyInvitations();
+  const joinRequests = useMyJoinRequests('incoming');
   const createGroup = useCreateGroup();
+  const respondToRequest = useRespondToJoinRequest();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
@@ -40,6 +49,14 @@ export function GroupsView() {
   const list = groups.data?.results ?? [];
   const pendingInvitations = (invitations.data?.results ?? []).filter(
     (invitation) => invitation.status === 'pending',
+  );
+  /**
+   * A request addressed to the caller. They are not in the group yet, so this
+   * inbox is the only place it can surface - the group itself will not appear in
+   * `list` until they accept.
+   */
+  const pendingRequests = (joinRequests.data?.results ?? []).filter(
+    (request) => request.status === 'pending',
   );
 
   const fieldError = (field: string): string | undefined =>
@@ -73,6 +90,25 @@ export function GroupsView() {
     }
   }
 
+  async function answerRequest(request: GroupJoinRequest, action: 'accept' | 'reject') {
+    try {
+      await respondToRequest.mutateAsync({
+        groupId: request.group,
+        requestId: request.id,
+        action,
+      });
+      toast({
+        tone: action === 'accept' ? 'success' : 'info',
+        message:
+          action === 'accept'
+            ? `You joined ${request.group_name}.`
+            : 'Request declined.',
+      });
+    } catch (caught) {
+      toast({ tone: 'error', message: errorMessage(caught, 'Could not respond to that request.') });
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -87,6 +123,56 @@ export function GroupsView() {
       />
 
       <Stack spacing={3}>
+        {pendingRequests.length > 0 ? (
+          <Section
+            title="Join requests for you"
+            description="A member asked you to join a group. Nothing changes until you accept."
+          >
+            <Stack spacing={1}>
+              {pendingRequests.map((request) => (
+                <Stack
+                  key={request.id}
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={1.5}
+                  sx={{ alignItems: { sm: 'center' } }}
+                >
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
+                      {request.group_name}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: colors.inkSoft }}>
+                      from {request.from_user_email} · {formatRelative(request.created_at)}
+                    </Typography>
+                    {request.message ? (
+                      <Typography variant="body2" sx={{ color: colors.inkSoft, mt: 0.25 }}>
+                        {request.message}
+                      </Typography>
+                    ) : null}
+                  </Box>
+                  <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      disabled={respondToRequest.isPending}
+                      onClick={() => void answerRequest(request, 'accept')}
+                    >
+                      Accept
+                    </Button>
+                    <Button
+                      size="small"
+                      color="inherit"
+                      disabled={respondToRequest.isPending}
+                      onClick={() => void answerRequest(request, 'reject')}
+                    >
+                      Decline
+                    </Button>
+                  </Stack>
+                </Stack>
+              ))}
+            </Stack>
+          </Section>
+        ) : null}
+
         {pendingInvitations.length > 0 ? (
           <Section
             title="Waiting for you"

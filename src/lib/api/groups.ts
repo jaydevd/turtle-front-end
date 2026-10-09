@@ -4,9 +4,9 @@
  *
  * The routes mirror `groups/urls.py`. Two of its choices are load-bearing here:
  *
- * - `invitations/` and `invitations/accept/` are declared above the
- *   `<uuid:group_id>` catch-all, so they are the caller's own inbox rather than a
- *   group's. They are a separate pair of functions for exactly that reason.
+ * - `join-requests/`, `invitations/` and `invitations/accept/` are declared
+ *   above the `<uuid:group_id>` catch-all, so they are the caller's own inbox
+ *   rather than a group's. They are separate functions for exactly that reason.
  * - Every id below a group is a UUID, so no route here can be reached with an
  *   `int`, which is the one shape that used to 404 by accident.
  *
@@ -126,10 +126,32 @@ export const joinRequestsApi = {
     );
   },
 
-  /** Asks a registered user to join. The recipient alone may accept or reject. */
+  /**
+   * The caller's own requests, from either side, with no group id required.
+   *
+   * This is the only route a recipient can reach before they have answered:
+   * they are not in `visible_groups`, so the group-scoped route above is closed
+   * to them until they know the group id - which is what they are waiting on
+   * this to learn.
+   */
+  mine(
+    scope?: JoinRequestScope,
+    signal?: AbortSignal,
+  ): Promise<Page<GroupJoinRequest>> {
+    return api.get<Page<GroupJoinRequest>>(
+      `${GROUPS}/join-requests/`,
+      { scope, limit: WORKING_SET_SIZE },
+      signal,
+    );
+  },
+
+  /**
+   * Asks a registered user to join, addressed by email. The recipient alone may
+   * accept or reject.
+   */
   create(groupId: string, input: JoinRequestCreate): Promise<GroupJoinRequest> {
     return api.post<GroupJoinRequest>(`${GROUPS}/${groupId}/join-requests/`, {
-      to_user: input.to_user,
+      email: input.email.trim().toLowerCase(),
       message: input.message?.trim() ?? '',
     });
   },

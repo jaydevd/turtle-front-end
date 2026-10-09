@@ -30,6 +30,13 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
   /** Replaces the cached user so profile edits are reflected app-wide. */
   updateUser: (user: User) => void;
+  /**
+   * Turns an already-issued `{tokens, user}` payload into a session. The Google
+   * callback lands with tokens in the URL rather than as a response body, and
+   * this is the same funnel `signIn` and `signUp` go through, so there is only
+   * one way to become authenticated.
+   */
+  adoptSession: (payload: AuthPayload) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -146,8 +153,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ status, user, signIn, signUp, signOut, updateUser }),
-    [status, user, signIn, signUp, signOut, updateUser],
+    () => ({ status, user, signIn, signUp, signOut, updateUser, adoptSession: adopt }),
+    [status, user, signIn, signUp, signOut, updateUser, adopt],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

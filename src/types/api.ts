@@ -31,6 +31,12 @@ export interface User {
   last_name: string;
   user_role: UserRole;
   is_deleted: boolean;
+  /** False for an account created through Google; Settings offers to set one. */
+  has_password: boolean;
+  /** Whether a Google account is linked. Settings offers connect or disconnect. */
+  google_connected: boolean;
+  /** The address Google reports for the link; null when nothing is connected. */
+  google_email: string | null;
   created_at: number;
 }
 
@@ -122,7 +128,11 @@ export interface Group {
   owner: string;
   owner_email: string;
   is_private: boolean;
-  /** Master switch for join requests aimed at registered users. */
+  /**
+   * Whether members below the admin tier may ask a registered user to join.
+   * Admins are never bound by it, so off means "members cannot ask", not "the
+   * group takes no requests".
+   */
   join_requests_enabled: boolean;
   /** Whether members below the admin tier may initiate either invite channel. */
   members_can_invite: boolean;
@@ -139,6 +149,8 @@ export interface GroupMembership {
   group: string;
   user: string;
   user_email: string;
+  /** Full name when the account has one, otherwise the email. */
+  display_name: string;
   role: GroupRole;
   joined_at: number;
   created_at: number;
@@ -317,6 +329,25 @@ export interface AuthPayload {
   user: User;
 }
 
+/**
+ * Why a Google sign in came back without a session. Produced by the backend's
+ * `/auth/google/callback/` redirect, which sends the reason in the query string
+ * so the landing page can explain it in the user's own terms.
+ */
+export type GoogleAuthFailure =
+  | 'access_denied'
+  | 'account_exists'
+  | 'account_inactive'
+  | 'google_unavailable'
+  | 'sign_in_failed';
+
+/**
+ * Why a Google *connection* - the connect action in Settings, as opposed to a
+ * sign in - did not complete. The same backend callback produces it and hands it
+ * back to Settings so it can be explained next to the button that started it.
+ */
+export type GoogleLinkFailure = 'access_denied' | 'google_taken' | 'link_failed';
+
 /* ------------------------------------------------------------------ */
 /* Write payloads                                                      */
 /* ------------------------------------------------------------------ */
@@ -394,8 +425,8 @@ export interface GroupCreate {
 export type GroupUpdate = Partial<GroupCreate>;
 
 export interface JoinRequestCreate {
-  /** The registered user being asked to join. Cannot be the caller. */
-  to_user: string;
+  /** The registered account being asked to join. Matched on address, not id. */
+  email: string;
   message?: string;
 }
 

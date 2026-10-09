@@ -335,17 +335,17 @@ export function createAppTheme(fonts: ThemeFonts): CssVarsTheme {
 
       MuiToggleButton: {
         styleOverrides: {
-          root: ({ theme: t }) => ({
+          root: {
             textTransform: 'none',
             fontWeight: 600,
             fontSize: '0.8125rem',
-            borderColor: t.palette.divider,
-            color: t.palette.text.secondary,
+            borderColor: 'var(--mui-palette-divider)',
+            color: 'var(--mui-palette-text-secondary)',
             '&.Mui-selected': {
-              backgroundColor: alpha(t.palette.primary.main, 0.12),
-              color: t.palette.primary.dark,
+              backgroundColor: 'color-mix(in srgb, var(--mui-palette-primary-main) 12%, transparent)',
+              color: 'var(--mui-palette-primary-main)',
             },
-          }),
+          },
         },
       },
 

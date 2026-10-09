@@ -1,27 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { Box, Button, IconButton, MenuItem, Stack, Tooltip, Typography } from '@mui/material';
-import DeleteOutlineRounded from '@mui/icons-material/DeleteOutlineRounded';
+import { Box, Divider, IconButton, Menu, MenuItem, Stack, Typography } from '@mui/material';
+import MoreVertRounded from '@mui/icons-material/MoreVertRounded';
 import GroupOffOutlined from '@mui/icons-material/GroupOffOutlined';
-import SwapHorizRounded from '@mui/icons-material/SwapHorizRounded';
-import { ConfirmDialog, FormDialog } from '@/components/ui/dialogs';
-import { SelectField } from '@/components/ui/inputs';
+import { ConfirmDialog } from '@/components/ui/dialogs';
 import { EmptyState } from '@/components/ui/surfaces';
 import { RolePill } from '@/components/ui/pills';
 import { useToast } from '@/components/feedback/ToastProvider';
 import { errorMessage } from '@/lib/api/client';
-import { useRemoveMember, useSetMemberRole, useTransferOwnership } from '@/lib/query/hooks';
+import { useRemoveMember, useSetMemberRole } from '@/lib/query/hooks';
 import { formatRelative } from '@/lib/date';
 import { useAppScheme } from '@/theme/useAppScheme';
 import { radii } from '@/theme/tokens';
-import type { Group, GroupMembership, GroupRole } from '@/types/api';
-
-/** Roles a caller may hand out. `owner` is absent: it has its own endpoint. */
-const ASSIGNABLE_ROLES: Array<{ value: GroupRole; label: string }> = [
-  { value: 'admin', label: 'Admin' },
-  { value: 'member', label: 'Member' },
-];
+import type { Group, GroupMembership } from '@/types/api';
 
 export interface MemberRosterProps {
   group: Group;
@@ -47,27 +39,27 @@ export function MemberRoster({ group, members, currentUserId, busy = false }: Me
   const { toast } = useToast();
   const setRole = useSetMemberRole();
   const removeMember = useRemoveMember();
-  const transferOwnership = useTransferOwnership();
 
   const [roleTarget, setRoleTarget] = useState<GroupMembership | null>(null);
-  const [nextRole, setNextRole] = useState<GroupRole>('member');
   const [removeTarget, setRemoveTarget] = useState<GroupMembership | null>(null);
-  const [transferTarget, setTransferTarget] = useState<string>('');
+  const [menuFor, setMenuFor] = useState<{ anchor: HTMLElement; member: GroupMembership } | null>(null);
 
   const isOwner = group.my_role === 'owner';
   const isAdmin = group.my_role === 'owner' || group.my_role === 'admin';
-  const transferCandidates = members.filter((membership) => membership.role !== 'owner');
+  const nextRole = roleTarget ? (roleTarget.role === 'admin' ? 'member' : 'admin') : 'member';
 
   function openRoleDialog(membership: GroupMembership) {
     setRoleTarget(membership);
-    setNextRole(membership.role === 'admin' ? 'member' : 'admin');
   }
 
   async function applyRole() {
     if (!roleTarget) return;
     try {
       await setRole.mutateAsync({ groupId: group.id, memberId: roleTarget.id, role: nextRole });
-      toast({ tone: 'success', message: `${roleTarget.user_email} is now a ${nextRole}.` });
+      toast({
+        tone: 'success',
+        message: `${roleTarget.display_name} is now a ${nextRole}.`,
+      });
       setRoleTarget(null);
     } catch (error) {
       toast({ tone: 'error', message: errorMessage(error, 'Could not change that role.') });
@@ -78,28 +70,14 @@ export function MemberRoster({ group, members, currentUserId, busy = false }: Me
     if (!removeTarget) return;
     try {
       await removeMember.mutateAsync({ groupId: group.id, memberId: removeTarget.id });
-      toast({ tone: 'success', message: `${removeTarget.user_email} was removed.` });
+      toast({
+        tone: 'success',
+        message: `${removeTarget.display_name} was removed.`,
+      });
       setRemoveTarget(null);
     } catch (error) {
       setRemoveTarget(null);
       toast({ tone: 'error', message: errorMessage(error, 'Could not remove that member.') });
-    }
-  }
-
-  async function confirmTransfer() {
-    const target = transferCandidates.find(
-      (membership) => membership.user === transferTarget,
-    );
-    if (!target) return;
-    try {
-      await transferOwnership.mutateAsync({ groupId: group.id, userId: target.user });
-      toast({
-        tone: 'success',
-        message: `${target.user_email} now owns this group. You are an admin.`,
-      });
-      setTransferTarget('');
-    } catch (error) {
-      toast({ tone: 'error', message: errorMessage(error, 'Could not transfer ownership.') });
     }
   }
 
@@ -109,7 +87,7 @@ export function MemberRoster({ group, members, currentUserId, busy = false }: Me
         compact
         icon={GroupOffOutlined}
         title="Nobody here yet"
-        description="Invite someone by email, or ask a registered user to join from the requests tab."
+        description="Invite someone by email, or ask a registered user to join from the Requests section on this page."
       />
     );
   }
@@ -150,7 +128,7 @@ export function MemberRoster({ group, members, currentUserId, busy = false }: Me
                 flexShrink: 0,
               }}
             >
-              {membership.user_email.slice(0, 1).toUpperCase()}
+              {membership.display_name.slice(0, 1).toUpperCase()}
             </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Stack
@@ -159,7 +137,7 @@ export function MemberRoster({ group, members, currentUserId, busy = false }: Me
                 sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}
               >
                 <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
-                  {membership.user_email}
+                  {membership.display_name}
                 </Typography>
                 {isSelf ? (
                   <Typography variant="caption" sx={{ color: colors.inkSoft }}>
@@ -167,75 +145,90 @@ export function MemberRoster({ group, members, currentUserId, busy = false }: Me
                   </Typography>
                 ) : null}
               </Stack>
-              <Typography variant="caption" sx={{ color: colors.inkSoft }}>
-                Joined {formatRelative(membership.joined_at)}
+              <Typography
+                variant="caption"
+                noWrap
+                sx={{ color: colors.inkSoft, display: 'block', minWidth: 0 }}
+              >
+                {membership.display_name !== membership.user_email
+                  ? `${membership.user_email} · Joined ${formatRelative(membership.joined_at)}`
+                  : `Joined ${formatRelative(membership.joined_at)}`}
               </Typography>
             </Box>
             <RolePill role={membership.role} />
             {manageable ? (
-              <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
-                <Button size="small" color="inherit" onClick={() => openRoleDialog(membership)}>
-                  {membership.role === 'admin' ? 'Demote' : 'Promote'}
-                </Button>
-                <Tooltip title="Remove from group">
-                  <IconButton
-                    size="small"
-                    aria-label={`Remove ${membership.user_email}`}
-                    onClick={() => setRemoveTarget(membership)}
-                    sx={{ color: colors.inkSoft }}
-                  >
-                    <DeleteOutlineRounded fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </Stack>
+              <IconButton
+                size="small"
+                aria-label={`Actions for ${membership.display_name}`}
+                aria-haspopup="menu"
+                onClick={(event) => setMenuFor({ anchor: event.currentTarget, member: membership })}
+                sx={{ color: colors.inkSoft, flexShrink: 0 }}
+              >
+                <MoreVertRounded fontSize="small" />
+              </IconButton>
             ) : null}
           </Stack>
         );
       })}
 
-      {isOwner && transferCandidates.length > 0 ? (
-        <Stack direction="row" sx={{ pt: 2 }}>
-          <Button
-            size="small"
-            variant="outlined"
-            color="inherit"
-            startIcon={<SwapHorizRounded />}
-            onClick={() => setTransferTarget(transferCandidates[0].user)}
-          >
-            Transfer ownership
-          </Button>
-        </Stack>
-      ) : null}
+      <Menu
+        anchorEl={menuFor?.anchor}
+        open={Boolean(menuFor)}
+        onClose={() => setMenuFor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        {menuFor ? (
+          <>
+            <MenuItem
+              onClick={() => {
+                const member = menuFor.member;
+                setMenuFor(null);
+                openRoleDialog(member);
+              }}
+            >
+              {menuFor.member.role === 'admin' ? 'Demote to member' : 'Promote to admin'}
+            </MenuItem>
+            <Divider sx={{ my: 0.5 }} />
+            <MenuItem
+              onClick={() => {
+                const member = menuFor.member;
+                setMenuFor(null);
+                setRemoveTarget(member);
+              }}
+              sx={{ color: 'error.main' }}
+            >
+              Remove from group
+            </MenuItem>
+          </>
+        ) : null}
+      </Menu>
 
-      <FormDialog
+      <ConfirmDialog
         open={Boolean(roleTarget)}
-        title={nextRole === 'admin' ? 'Make an admin' : 'Demote to member'}
-        description="Admins can change the group settings, manage members, and start or stop challenges."
+        title={nextRole === 'admin' ? 'Make an admin?' : 'Move to member?'}
+        message={
+          roleTarget ? (
+            <>
+              <strong>{roleTarget.display_name}</strong> will{' '}
+              {nextRole === 'admin'
+                ? 'be able to change the group settings, manage members, and start or stop challenges.'
+                : 'lose the extra admin rights and return to being a regular member.'}
+            </>
+          ) : null
+        }
         confirmLabel={nextRole === 'admin' ? 'Promote' : 'Demote'}
         busy={setRole.isPending}
         onConfirm={applyRole}
         onClose={() => setRoleTarget(null)}
-      >
-        <SelectField
-          label="Role"
-          name="role"
-          value={nextRole}
-          onChange={(event) => setNextRole(event.target.value as GroupRole)}
-        >
-          {ASSIGNABLE_ROLES.map((role) => (
-            <MenuItem key={role.value} value={role.value}>
-              {role.label}
-            </MenuItem>
-          ))}
-        </SelectField>
-      </FormDialog>
+      />
 
       <ConfirmDialog
         open={Boolean(removeTarget)}
         title="Remove this member?"
         message={
           <>
-            <strong>{removeTarget?.user_email}</strong> loses access to the group immediately.
+            <strong>{removeTarget?.display_name}</strong> loses access to the group immediately.
             Their own habits and history stay intact.
           </>
         }
@@ -245,30 +238,6 @@ export function MemberRoster({ group, members, currentUserId, busy = false }: Me
         onConfirm={confirmRemove}
         onClose={() => setRemoveTarget(null)}
       />
-
-      <FormDialog
-        open={Boolean(transferTarget)}
-        title="Hand over this group?"
-        description="They gain every admin right, and you drop to admin. This cannot be undone by them."
-        confirmLabel="Transfer ownership"
-        busy={transferOwnership.isPending}
-        disabled={!transferTarget}
-        onConfirm={confirmTransfer}
-        onClose={() => setTransferTarget('')}
-      >
-        <SelectField
-          label="New owner"
-          name="new-owner"
-          value={transferTarget}
-          onChange={(event) => setTransferTarget(event.target.value)}
-        >
-          {transferCandidates.map((membership) => (
-            <MenuItem key={membership.user} value={membership.user}>
-              {membership.user_email}
-            </MenuItem>
-          ))}
-        </SelectField>
-      </FormDialog>
     </Stack>
   );
 }

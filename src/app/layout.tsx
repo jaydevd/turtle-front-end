@@ -34,8 +34,8 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Habit Tracker',
-    template: '%s · Habit Tracker',
+    default: 'Turtle',
+    template: '%s · Turtle',
   },
   description: 'Build consistency, one day at a time.',
 };

@@ -1,8 +1,6 @@
 'use client';
 
-import { Box, Button, LinearProgress, Stack, Typography } from '@mui/material';
-import ArrowBackRounded from '@mui/icons-material/ArrowBackRounded';
-import Link from 'next/link';
+import { Box, LinearProgress, Stack, Typography } from '@mui/material';
 import {
   ErrorState,
   InlineEmpty,
@@ -11,6 +9,7 @@ import {
   Section,
   StatTile,
 } from '@/components/ui/surfaces';
+import { BackLink } from '@/components/ui/BackLink';
 import {
   HourOfDayBars,
   InsightsHeatmap,
@@ -25,18 +24,7 @@ export function HabitAnalysisView({ habitId }: { habitId: string }) {
   const insights = useHabitInsights(habitId, 90);
   const habit = useHabit(habitId);
 
-  const backButton = (
-    <Button
-      component={Link}
-      href={`/habits/${habitId}`}
-      color="inherit"
-      size="small"
-      startIcon={<ArrowBackRounded />}
-      sx={{ mb: 2 }}
-    >
-      Back to habit
-    </Button>
-  );
+  const backButton = <BackLink href={`/habits/${habitId}`}>Back to habit</BackLink>;
 
   if (insights.isError || habit.isError) {
     return (

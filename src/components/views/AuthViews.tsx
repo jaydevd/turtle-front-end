@@ -1,19 +1,16 @@
 'use client';
 
-import { Field } from '@/components/ui/inputs';
+import { Field, PasswordField } from '@/components/ui/inputs';
 import { Surface } from '@/components/ui/surfaces';
 import { errorMessage, isApiError } from '@/lib/api/client';
+import { googleSignInUrl } from '@/lib/api/auth';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { radii } from '@/theme/tokens';
 import { useAppScheme } from '@/theme/useAppScheme';
-import VisibilityOffOutlined from '@mui/icons-material/VisibilityOffOutlined';
-import VisibilityOutlined from '@mui/icons-material/VisibilityOutlined';
 import {
     Alert,
     Box,
     Button,
-    IconButton,
-    InputAdornment,
     Stack,
     Typography,
 } from '@mui/material';
@@ -23,11 +20,20 @@ import { useState } from 'react';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function authenticatedDestination(): string {
+/**
+ * Where the user was headed before being sent to sign in. Guarded the same way
+ * on both sides of the Google round trip: the backend signs the destination into
+ * the OAuth `state` and will not carry anything that is not a rooted path.
+ */
+function requestedNext(): string | undefined {
   const requested = new URLSearchParams(window.location.search).get('next');
   return requested?.startsWith('/') && !requested.startsWith('//')
     ? requested
-    : '/dashboard';
+    : undefined;
+}
+
+function authenticatedDestination(): string {
+  return requestedNext() ?? '/dashboard';
 }
 
 function validateEmail(email: string): string | undefined {
@@ -44,55 +50,73 @@ function validateNewPassword(password: string): string | undefined {
   return undefined;
 }
 
-function PasswordField({
-  label,
-  value,
-  onChange,
-  errorText,
-  autoComplete,
-  helperText,
-  required = true,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  errorText?: string;
-  autoComplete?: string;
-  helperText?: string;
-  required?: boolean;
-}) {
-  const [visible, setVisible] = useState(false);
+/**
+ * The four-colour G. Google's brand rules only permit this mark as-is, so it is
+ * inlined rather than approximated, and it is decorative - the button's own label
+ * already says who it belongs to.
+ */
+function GoogleMark() {
   return (
-    <Field
-      label={label}
-      type={visible ? 'text' : 'password'}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      errorText={errorText}
-      helperText={helperText}
-      autoComplete={autoComplete}
-      required={required}
-      slotProps={{
-        input: {
-          endAdornment: (
-            <InputAdornment position="end">
-              <IconButton
-                size="small"
-                edge="end"
-                onClick={() => setVisible((current) => !current)}
-                aria-label={visible ? 'Hide password' : 'Show password'}
-              >
-                {visible ? (
-                  <VisibilityOffOutlined fontSize="small" />
-                ) : (
-                  <VisibilityOutlined fontSize="small" />
-                )}
-              </IconButton>
-            </InputAdornment>
-          ),
-        },
-      }}
-    />
+    <Box
+      component="svg"
+      viewBox="0 0 48 48"
+      aria-hidden="true"
+      sx={{ width: 18, height: 18, flexShrink: 0 }}
+    >
+      <path
+        fill="#EA4335"
+        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+      />
+      <path
+        fill="#4285F4"
+        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+      />
+    </Box>
+  );
+}
+
+/** Only the rules are decorative; the label still tells a screen reader there is a second way in. */
+function AuthDivider({ label }: { label: string }) {
+  const { colors } = useAppScheme();
+  return (
+    <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+      <Box aria-hidden="true" sx={{ flex: 1, height: '1px', backgroundColor: colors.hairline }} />
+      <Typography variant="caption" sx={{ color: colors.inkSoft }}>
+        {label}
+      </Typography>
+      <Box aria-hidden="true" sx={{ flex: 1, height: '1px', backgroundColor: colors.hairline }} />
+    </Stack>
+  );
+}
+
+/**
+ * Signing in with Google is a navigation away and back, not a request this client
+ * makes: the backend redirects to Google and returns with a session in the URL.
+ * So the destination is resolved at click time - reading `window` during render
+ * would break the server-rendered pass - and the button is a plain `button` so it
+ * can never submit the form it happens to sit inside.
+ */
+function GoogleButton() {
+  return (
+    <Button
+      type="button"
+      variant="outlined"
+      size="large"
+      fullWidth
+      onClick={() => window.location.assign(googleSignInUrl(requestedNext()))}
+      startIcon={<GoogleMark />}
+      sx={{ borderRadius: `${radii.pill}px` }}
+    >
+      Continue with Google
+    </Button>
   );
 }
 
@@ -186,6 +210,8 @@ export function LoginView() {
       }
     >
       <Stack component="form" spacing={2.25} onSubmit={handleSubmit} noValidate>
+        <GoogleButton />
+        <AuthDivider label="or" />
         {error && !fieldError('email') && !fieldError('password') ? (
           <Alert severity="error">{errorMessage(error, 'Could not sign you in.')}</Alert>
         ) : null}
@@ -306,6 +332,8 @@ export function SignUpView() {
       }
     >
       <Stack component="form" spacing={2.25} onSubmit={handleSubmit} noValidate>
+        <GoogleButton />
+        <AuthDivider label="or" />
         {error && !hasFieldErrors ? (
           <Alert severity="error">{errorMessage(error, 'Could not create your account.')}</Alert>
         ) : null}

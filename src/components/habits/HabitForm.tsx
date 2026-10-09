@@ -15,7 +15,7 @@ import { errorMessage, isApiError } from '@/lib/api/client';
 import { useCreateTag } from '@/lib/query/hooks';
 import { frequencyOptions } from '@/lib/schedule';
 import { fromApiTime, toApiTime, fromDateInputValue, toDateInputValue } from '@/lib/date';
-import { habitSwatches, radii } from '@/theme/tokens';
+import { habitSwatches, layout as layoutTokens } from '@/theme/tokens';
 import { useAppScheme } from '@/theme/useAppScheme';
 import { defaultIconKey, isValidIcon } from '@/components/ui/HabitIcon';
 import type {
@@ -375,18 +375,34 @@ export function HabitForm({
             </Stack>
           </Stack>
         </Section>
+      </Stack>
 
-        <Stack
-          direction="row"
-          spacing={1.25}
+      <Box
+        component="footer"
+        sx={{
+          position: 'fixed',
+          left: { xs: 0, md: layoutTokens.sidebarWidth },
+          right: 0,
+          bottom: 0,
+          zIndex: (t) => t.zIndex.appBar,
+          display: 'flex',
+          alignItems: 'center',
+          px: { xs: 2, md: 3.5 },
+          height: 60,
+          backdropFilter: 'blur(10px)',
+          backgroundColor: `color-mix(in srgb, ${colors.canvas} 82%, transparent)`,
+          borderTop: `1px solid ${colors.hairline}`,
+        }}
+      >
+        <Box
           sx={{
-            position: 'sticky',
-            bottom: 0,
-            py: 2,
-            backgroundColor: colors.canvas,
-            borderTop: `1px solid ${colors.hairline}`,
-            borderRadius: `${radii.sm}px`,
+            width: '100%',
+            maxWidth: 760,
+            mx: 'auto',
+            display: 'flex',
+            alignItems: 'center',
             justifyContent: 'flex-end',
+            gap: 1.25,
           }}
         >
           <Button onClick={onCancel} color="inherit" disabled={busy}>
@@ -395,8 +411,8 @@ export function HabitForm({
           <Button type="submit" variant="contained" disabled={busy}>
             {busy ? 'Saving…' : mode === 'create' ? 'Create habit' : 'Save changes'}
           </Button>
-        </Stack>
-      </Stack>
+        </Box>
+      </Box>
     </Box>
   );
 }

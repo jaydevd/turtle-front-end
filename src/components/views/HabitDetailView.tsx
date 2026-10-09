@@ -14,7 +14,6 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import ArrowBackRounded from '@mui/icons-material/ArrowBackRounded';
 import EditOutlined from '@mui/icons-material/EditOutlined';
 import DeleteOutlineRounded from '@mui/icons-material/DeleteOutlineRounded';
 import MoreVertRounded from '@mui/icons-material/MoreVertRounded';
@@ -37,6 +36,7 @@ import { StatusPill, TagChip } from '@/components/ui/pills';
 import { Heatmap, HeatmapLegend } from '@/components/ui/Heatmap';
 import { NumberStepper } from '@/components/ui/inputs';
 import { ConfirmDialog } from '@/components/ui/dialogs';
+import { BackLink } from '@/components/ui/BackLink';
 import { CheckInControl } from '@/components/habits/CheckInControl';
 import { LogTimeline } from '@/components/habits/LogTimeline';
 import { useToast } from '@/components/feedback/ToastProvider';
@@ -131,9 +131,7 @@ export function HabitDetailView({ habitId }: { habitId: string }) {
   if (habit.isError) {
     return (
       <>
-        <Button component={Link} href="/habits" color="inherit" size="small" startIcon={<ArrowBackRounded />} sx={{ mb: 2 }}>
-          Back to habits
-        </Button>
+        <BackLink href="/habits">Back to habits</BackLink>
         <ErrorState message={errorMessage(habit.error)} onRetry={() => void habit.refetch()} />
       </>
     );
@@ -149,16 +147,7 @@ export function HabitDetailView({ habitId }: { habitId: string }) {
 
   return (
     <>
-      <Button
-        component={Link}
-        href="/habits"
-        color="inherit"
-        size="small"
-        startIcon={<ArrowBackRounded />}
-        sx={{ mb: 2 }}
-      >
-        Back to habits
-      </Button>
+      <BackLink href="/habits">Back to habits</BackLink>
 
       <Surface sx={{ mb: 3 }}>
         <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start', flexWrap: 'wrap', rowGap: 2 }}>

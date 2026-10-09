@@ -4,6 +4,8 @@ import {
   Box,
   FormControl,
   FormHelperText,
+  IconButton,
+  InputAdornment,
   InputLabel,
   Select,
   Stack,
@@ -14,11 +16,14 @@ import {
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import type { SelectChangeEvent, TextFieldProps } from '@mui/material';
+import VisibilityOffOutlined from '@mui/icons-material/VisibilityOffOutlined';
+import VisibilityOutlined from '@mui/icons-material/VisibilityOutlined';
 import { habitIconKeys, habitSwatches, radii, weekdayLabels } from '@/theme/tokens';
 import type { HabitIconKey } from '@/theme/tokens';
 import { useAppScheme } from '@/theme/useAppScheme';
 import { tabularNums } from '@/theme/typography';
 import { iconMap } from './HabitIcon';
+import { useState } from 'react';
 import type { Weekday } from '@/types/api';
 
 export interface FieldProps extends Omit<TextFieldProps, 'label' | 'helperText'> {
@@ -43,6 +48,66 @@ export function Field({ label, errorText, helperText, sx, ...rest }: FieldProps)
       }}
       {...rest}
       sx={{ '& .MuiInputLabel-root': { fontSize: '0.875rem' }, ...sx }}
+    />
+  );
+}
+
+export interface PasswordFieldProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  errorText?: string;
+  autoComplete?: string;
+  helperText?: React.ReactNode;
+  /** Pass false only where the field is genuinely optional. */
+  required?: boolean;
+}
+
+/**
+ * A password input with a visibility toggle. Typed against a plain string rather
+ * than a change event so callers hold no input state of their own beyond the
+ * string they need to submit.
+ */
+export function PasswordField({
+  label,
+  value,
+  onChange,
+  errorText,
+  autoComplete,
+  helperText,
+  required = true,
+}: PasswordFieldProps) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <Field
+      label={label}
+      type={visible ? 'text' : 'password'}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      errorText={errorText}
+      helperText={helperText}
+      autoComplete={autoComplete}
+      required={required}
+      slotProps={{
+        input: {
+          endAdornment: (
+            <InputAdornment position="end">
+              <IconButton
+                size="small"
+                edge="end"
+                onClick={() => setVisible((current) => !current)}
+                aria-label={visible ? 'Hide password' : 'Show password'}
+              >
+                {visible ? (
+                  <VisibilityOffOutlined fontSize="small" />
+                ) : (
+                  <VisibilityOutlined fontSize="small" />
+                )}
+              </IconButton>
+            </InputAdornment>
+          ),
+        },
+      }}
     />
   );
 }
@@ -121,6 +186,7 @@ export function SegmentedControl<T extends string>({
   fullWidth?: boolean;
   ariaLabel?: string;
 }) {
+  const { colors, shadows } = useAppScheme();
   return (
     <ToggleButtonGroup
       exclusive
@@ -132,14 +198,23 @@ export function SegmentedControl<T extends string>({
       aria-label={ariaLabel}
       sx={{
         width: fullWidth ? '100%' : 'auto',
+        p: 0.25,
+        border: '1px solid',
+        borderColor: 'divider',
         borderRadius: radii.pill,
+        backgroundColor: 'background.default',
         '& .MuiToggleButton-root': {
           borderRadius: `${radii.pill}px !important`,
           px: fullWidth ? 1 : 2,
           flex: fullWidth ? 1 : 'initial',
           borderColor: 'transparent',
-          '&.Mui-selected': { backgroundColor: 'background.paper' },
-          '&.Mui-selected:hover': { backgroundColor: 'background.paper' },
+          color: colors.inkSoft,
+          '&.Mui-selected': {
+            backgroundColor: 'background.paper',
+            color: colors.primaryInk,
+            boxShadow: shadows.card,
+          },
+          '&.Mui-selected:hover': { backgroundColor: 'background.paper', color: colors.primaryInk },
         },
       }}
     >

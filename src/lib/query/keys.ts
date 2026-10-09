@@ -40,6 +40,12 @@ export const groupKeys = {
   members: (id: string) => ['groups', 'members', id] as const,
   joinRequests: (id: string, scope?: JoinRequestScope) =>
     ['groups', 'join-requests', id, scope ?? 'all'] as const,
+  /**
+   * The caller's own join-request inbox. `mine` sits where a group id would, so
+   * it shares the branch without ever colliding with a real one.
+   */
+  myJoinRequests: (scope?: JoinRequestScope) =>
+    ['groups', 'join-requests', 'mine', scope ?? 'all'] as const,
   /** `mine` is the caller's inbox, so it sits in the same branch but never collides. */
   myInvitations: ['groups', 'invitations', 'mine'] as const,
   invitations: (id: string) => ['groups', 'invitations', id] as const,
