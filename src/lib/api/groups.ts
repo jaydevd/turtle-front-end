@@ -1,12 +1,13 @@
 /**
- * Group transport: groups, the member roster, join requests, email invitations
- * and the challenges proposed inside a group.
+ * Group transport: groups, the member roster, join requests, the email
+ * invitation a join request sometimes arrives through, and the challenges
+ * proposed inside a group.
  *
  * The routes mirror `groups/urls.py`. Two of its choices are load-bearing here:
  *
- * - `join-requests/`, `invitations/` and `invitations/accept/` are declared
- *   above the `<uuid:group_id>` catch-all, so they are the caller's own inbox
- *   rather than a group's. They are separate functions for exactly that reason.
+ * - `join-requests/` is declared above the `<uuid:group_id>` catch-all, so it is
+ *   the caller's own inbox rather than a group's. That is a separate function
+ *   from the group-scoped list for exactly that reason.
  * - Every id below a group is a UUID, so no route here can be reached with an
  *   `int`, which is the one shape that used to 404 by accident.
  *
@@ -26,10 +27,10 @@ import type {
     GroupRole,
     GroupUpdate,
     Habit,
-    InvitationAcceptResult,
     InvitationCreate,
     JoinRequestCreate,
     JoinRequestScope,
+    MemberLookupResult,
     Page,
 } from '@/types/api';
 import { api } from './client';
@@ -84,6 +85,26 @@ export const groupsApi = {
       { limit: WORKING_SET_SIZE },
       signal,
     );
+  },
+
+  /**
+   * Resolves a typed address to accounts the caller could ask to join. A hit is
+   * a candidate for a join request; an empty result is the composer's cue to
+   * offer an email invitation instead, which is why a miss is an empty list and
+   * not a 404.
+   */
+  lookupMembers(
+    groupId: string,
+    email: string,
+    signal?: AbortSignal,
+  ): Promise<MemberLookupResult[]> {
+    return api
+      .get<{ results: MemberLookupResult[] }>(
+        `${GROUPS}/${groupId}/member-lookup/`,
+        { email },
+        signal,
+      )
+      .then((payload) => payload.results);
   },
 
   /**
@@ -172,50 +193,16 @@ export const joinRequestsApi = {
 
 export const invitationsApi = {
   /**
-   * The caller's own pending invitations, matched on their email. This is the
-   * route that makes an invitation issued to an unregistered address reachable:
-   * the row appears the moment its owner has an account.
-   */
-  mine(signal?: AbortSignal): Promise<Page<GroupInvitation>> {
-    return api.get<Page<GroupInvitation>>(
-      `${GROUPS}/invitations/`,
-      { limit: WORKING_SET_SIZE },
-      signal,
-    );
-  },
-
-  /** The group's sent log, for revoking a pending link and copying it by hand. */
-  list(groupId: string, signal?: AbortSignal): Promise<Page<GroupInvitation>> {
-    return api.get<Page<GroupInvitation>>(
-      `${GROUPS}/${groupId}/invitations/`,
-      { limit: WORKING_SET_SIZE },
-      signal,
-    );
-  },
-
-  /**
-   * Invites an address with no account. A registered address is refused with a
-   * 411 pointing at join requests instead.
+   * Invites an address with no account, by email. The endpoint writes the join
+   * request the invitee will answer at the same time, so this is the one call
+   * the composer makes when its search finds nobody. A registered address is
+   * refused with a 411 pointing at join requests instead.
    */
   create(groupId: string, input: InvitationCreate): Promise<GroupInvitation> {
     return api.post<GroupInvitation>(`${GROUPS}/${groupId}/invitations/`, {
       email: input.email.trim().toLowerCase(),
       ...(input.expires_at ? { expires_at: input.expires_at } : {}),
     });
-  },
-
-  /** Revokes a pending invitation. One already answered is left alone. */
-  revoke(groupId: string, invitationId: string): Promise<void> {
-    return api.delete<void>(`${GROUPS}/${groupId}/invitations/${invitationId}/`);
-  },
-
-  /**
-   * Claims an invitation by token and joins the group it names. Idempotent, so an
-   * invite link opened twice - or one already promoted to a join request at
-   * registration - still lands the caller in the group.
-   */
-  accept(token: string): Promise<InvitationAcceptResult> {
-    return api.post<InvitationAcceptResult>(`${GROUPS}/invitations/accept/`, { token });
   },
 };
 

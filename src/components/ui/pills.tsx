@@ -9,7 +9,6 @@ import type {
   ChallengeStatus,
   GroupRole,
   HabitStatus,
-  InvitationStatus,
   JoinRequestStatus,
 } from '@/types/api';
 
@@ -194,13 +193,6 @@ export const joinRequestStatusLabels: Record<JoinRequestStatus, string> = {
   cancelled: 'Withdrawn',
 };
 
-export const invitationStatusLabels: Record<InvitationStatus, string> = {
-  pending: 'Pending',
-  accepted: 'Accepted',
-  expired: 'Expired',
-  revoked: 'Revoked',
-};
-
 export const challengeStatusLabels: Record<ChallengeStatus, string> = {
   draft: 'Draft',
   active: 'Running',
@@ -265,13 +257,6 @@ const joinRequestTones: Record<JoinRequestStatus, MetaTone> = {
   cancelled: 'default',
 };
 
-const invitationTones: Record<InvitationStatus, MetaTone> = {
-  pending: 'info',
-  accepted: 'success',
-  expired: 'default',
-  revoked: 'default',
-};
-
 const challengeTones: Record<ChallengeStatus, MetaTone> = {
   draft: 'default',
   active: 'info',
@@ -292,18 +277,6 @@ export function JoinRequestStatusPill({
 }) {
   return (
     <MetaPill label={joinRequestStatusLabels[status]} tone={joinRequestTones[status]} size={size} />
-  );
-}
-
-export function InvitationStatusPill({
-  status,
-  size,
-}: {
-  status: InvitationStatus;
-  size?: 'small' | 'medium';
-}) {
-  return (
-    <MetaPill label={invitationStatusLabels[status]} tone={invitationTones[status]} size={size} />
   );
 }
 

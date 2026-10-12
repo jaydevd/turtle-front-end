@@ -8,29 +8,46 @@ import { EmptyState, InlineEmpty } from '@/components/ui/surfaces';
 import { errorMessage, isApiError } from '@/lib/api/client';
 import { formatRelative } from '@/lib/date';
 import {
+    useMemberLookup,
     useRespondToJoinRequest,
+    useSendInvitation,
     useSendJoinRequest,
     useWithdrawJoinRequest,
 } from '@/lib/query/hooks';
 import { useAppScheme } from '@/theme/useAppScheme';
-import type { Group, GroupJoinRequest, JoinRequestScope } from '@/types/api';
-import ContentCopyRounded from '@mui/icons-material/ContentCopyRounded';
+import type {
+  Group,
+  GroupJoinRequest,
+  JoinRequestScope,
+  MemberLookupResult,
+} from '@/types/api';
 import MailOutlineRounded from '@mui/icons-material/MailOutlineRounded';
 import { Alert, Box, Button, Stack, Typography } from '@mui/material';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const SCOPE_OPTIONS: Array<{ value: JoinRequestScope; label: string }> = [
   { value: 'incoming', label: 'For you' },
   { value: 'outgoing', label: 'Sent by you' },
 ];
 
+/** How long the composer waits after the last keystroke before searching. */
+const LOOKUP_DEBOUNCE_MS = 300;
+
+/** A pragmatic shape check; the server is the authority on who exists. */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /**
- * Requests to join, in both directions.
+ * Requests to join, in both directions - and the one composer that starts them.
  *
  * The direction is the interesting part: a member *asks* somebody to join and
  * that somebody decides. So only the recipient is offered Accept or Reject, only
- * the sender is offered Withdraw, and everyone is offered the send form - which
- * is why the same list needs both labels.
+ * the sender is offered Withdraw, and everyone who may reach out gets the send
+ * form, which is why the same list needs both labels.
+ *
+ * The composer is deliberately one field rather than two panels. Typing an
+ * address searches for it: a hit is somebody to ask, and a miss is the signal to
+ * invite them by email instead. Both routes end in the same pending request, so
+ * the sender watches them in the same list.
  */
 export interface JoinRequestPanelProps {
   group: Group;
@@ -60,38 +77,91 @@ export function JoinRequestPanel({
   const { colors } = useAppScheme();
   const { toast } = useToast();
   const sendRequest = useSendJoinRequest();
+  const sendInvitation = useSendInvitation();
   const withdrawRequest = useWithdrawJoinRequest();
   const respond = useRespondToJoinRequest();
 
   const [sendOpen, setSendOpen] = useState(false);
   const [email, setEmail] = useState('');
+  const [settledEmail, setSettledEmail] = useState('');
+  const [picked, setPicked] = useState<MemberLookupResult | null>(null);
   const [message, setMessage] = useState('');
   const [sendError, setSendError] = useState<unknown>(null);
   const [withdrawTarget, setWithdrawTarget] = useState<GroupJoinRequest | null>(null);
-  const [requestLinkReady, setRequestLinkReady] = useState(false);
 
   const scopeOptions = isAdmin
     ? [...SCOPE_OPTIONS, { value: 'pending' as JoinRequestScope, label: 'All pending' }]
     : SCOPE_OPTIONS;
 
-  const canSend =
+  // Reaching out at all needs the invite switch. A join request additionally
+  // needs the requests switch, since an admin may hand requests out of the
+  // members' hands while leaving invitations open.
+  const canReachOut = group.my_role !== null && (isAdmin || group.members_can_invite);
+  const canAsk =
     group.my_role !== null &&
     (isAdmin || (group.join_requests_enabled && group.members_can_invite));
 
-  async function submitRequest() {
-    const address = email.trim();
-    if (!address) return;
+  /*
+   * Settle the typed address before searching, so a query runs once per pause
+   * rather than once per keystroke.
+   */
+  useEffect(() => {
+    const handle = window.setTimeout(() => setSettledEmail(email.trim()), LOOKUP_DEBOUNCE_MS);
+    return () => window.clearTimeout(handle);
+  }, [email]);
+
+  const lookup = useMemberLookup(group.id, settledEmail, sendOpen);
+  const matches = lookup.data ?? [];
+
+  const address = email.trim();
+  const looksLikeEmail = EMAIL_PATTERN.test(address);
+  const searching = lookup.isFetching;
+
+  /*
+   * A pick only counts while it is still one of the matches. Rather than clear it
+   * when the address changes - which would be a state write during render - the
+   * stale pick is simply ignored once the results no longer contain it. With a
+   * single match there is nothing to choose between, so it stands in on its own;
+   * more than one is a list for the sender to pick from.
+   */
+  const pickedStillMatches =
+    picked !== null && matches.some((match) => match.id === picked.id);
+  const target = pickedStillMatches ? picked : matches.length === 1 ? matches[0] : null;
+
+  // A complete address that matched nobody: the composer's cue to invite.
+  const inviting = !target && !searching && matches.length === 0 && looksLikeEmail;
+  const canSubmit = target ? canAsk : inviting;
+
+  const busy = sendRequest.isPending || sendInvitation.isPending;
+  const fieldError = (field: string) =>
+    isApiError(sendError) ? sendError.fieldError(field) : undefined;
+
+  function resetComposer() {
+    setEmail('');
+    setSettledEmail('');
+    setPicked(null);
+    setMessage('');
+    setSendError(null);
+  }
+
+  async function submitComposer() {
     setSendError(null);
     try {
-      await sendRequest.mutateAsync({
-        groupId: group.id,
-        input: { email: address, message },
-      });
-      toast({ tone: 'success', message: 'Request sent. They decide from here.' });
-      setRequestLinkReady(true);
+      if (target) {
+        await sendRequest.mutateAsync({
+          groupId: group.id,
+          input: { email: target.email, message },
+        });
+        toast({ tone: 'success', message: 'Request sent. They decide from here.' });
+      } else {
+        await sendInvitation.mutateAsync({ groupId: group.id, input: { email: address } });
+        toast({
+          tone: 'success',
+          message: 'Invitation sent. They will get an email to create their account.',
+        });
+      }
       setSendOpen(false);
-      setEmail('');
-      setMessage('');
+      resetComposer();
       onScopeChange('outgoing');
     } catch (error) {
       setSendError(error);
@@ -122,39 +192,8 @@ export function JoinRequestPanel({
     }
   }
 
-  const fieldError = (field: string) => (isApiError(sendError) ? sendError.fieldError(field) : undefined);
-
-  async function copyRequestLink() {
-    const link = `${window.location.origin}/groups/${group.id}/requests`;
-    try {
-      await navigator.clipboard.writeText(link);
-      toast({ tone: 'success', message: 'Request review link copied.' });
-    } catch {
-      toast({ tone: 'info', message: link });
-    }
-  }
-
   return (
     <Stack spacing={2.5}>
-      {requestLinkReady ? (
-        <Alert
-          severity="info"
-          action={
-            <Button
-              color="inherit"
-              size="small"
-              startIcon={<ContentCopyRounded />}
-              onClick={() => void copyRequestLink()}
-            >
-              Copy link
-            </Button>
-          }
-        >
-          They will find it in their own inbox under Groups. Copy the review link
-          too if you would rather send them straight to it.
-        </Alert>
-      ) : null}
-
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
         spacing={1.5}
@@ -166,15 +205,13 @@ export function JoinRequestPanel({
           options={scopeOptions}
           onChange={onScopeChange}
         />
-        {canSend ? (
+        {canReachOut ? (
           <Button size="small" variant="contained" onClick={() => setSendOpen(true)}>
-            Ask someone to join
+            Invite or ask someone
           </Button>
         ) : (
           <Typography variant="caption" sx={{ color: colors.inkSoft }}>
-            {group.join_requests_enabled && group.members_can_invite
-              ? 'Only admins can ask people to join here.'
-              : 'You cannot ask people to join here. An admin still can.'}
+            Only admins can bring people into this group.
           </Typography>
         )}
       </Stack>
@@ -185,11 +222,19 @@ export function JoinRequestPanel({
         <EmptyState
           compact
           icon={MailOutlineRounded}
-          title={scope === 'incoming' ? 'No requests waiting on you' : 'You have not asked anyone yet'}
+          title={
+            scope === 'incoming'
+              ? 'No requests waiting on you'
+              : scope === 'pending'
+                ? 'Nothing pending'
+                : 'You have not asked anyone yet'
+          }
           description={
             scope === 'incoming'
               ? 'When a member asks you to join a group, it lands here to accept or decline.'
-              : 'Ask a registered user to join by entering their email address.'
+              : scope === 'pending'
+                ? 'Every outstanding request in this group, whichever way it points.'
+                : 'Enter an email address to ask someone to join, or invite them if they are not on the platform yet.'
           }
         />
       ) : (
@@ -265,40 +310,109 @@ export function JoinRequestPanel({
 
       <FormDialog
         open={sendOpen}
-        title="Ask someone to join"
-        description="They get to accept or decline. Nothing is added to the group until they say yes."
-        confirmLabel="Send request"
-        busy={sendRequest.isPending}
-        disabled={!email.trim()}
-        onConfirm={submitRequest}
+        title="Invite or ask someone"
+        description="Search for their email. If they are already here they get a request to accept or decline; if not, they get an invitation to create an account first."
+        confirmLabel={target ? 'Send request' : 'Invite'}
+        busy={busy}
+        disabled={!canSubmit}
+        onConfirm={submitComposer}
         onClose={() => {
           setSendOpen(false);
-          setSendError(null);
+          resetComposer();
         }}
       >
         <Stack spacing={2}>
           {sendError && !fieldError('email') ? (
-            <Alert severity="error">{errorMessage(sendError, 'Could not send that request.')}</Alert>
+            <Alert severity="error">
+              {errorMessage(sendError, 'Could not reach that address.')}
+            </Alert>
           ) : null}
+
           <Field
             label="Email"
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             errorText={fieldError('email')}
-            helperText="The address they registered with. They accept or decline from their own inbox."
+            helperText="We check as you type whether they already have an account."
             placeholder="somebody@example.com"
             autoFocus
           />
-          <Field
-            label="Message"
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            errorText={fieldError('message')}
-            helperText="Optional. They see this with the request."
-            multiline
-            minRows={2}
-          />
+
+          {searching && settledEmail.length >= 2 ? (
+            <Typography variant="caption" sx={{ color: colors.inkSoft }}>
+              Searching…
+            </Typography>
+          ) : null}
+
+          {matches.length > 1 ? (
+            <Stack spacing={0.75}>
+              <Typography variant="caption" sx={{ color: colors.inkSoft }}>
+                More than one account matches. Pick one:
+              </Typography>
+              {matches.map((match) => {
+                const active = picked?.id === match.id;
+                return (
+                  <Box
+                    key={match.id}
+                    component="button"
+                    type="button"
+                    onClick={() => setPicked(match)}
+                    sx={{
+                      textAlign: 'left',
+                      px: 1.5,
+                      py: 1.25,
+                      borderRadius: 2,
+                      border: `1px solid ${active ? colors.sage : colors.hairline}`,
+                      backgroundColor: active ? colors.paperRaised : 'transparent',
+                      cursor: 'pointer',
+                      color: 'inherit',
+                      font: 'inherit',
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {match.display_name}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: colors.inkSoft }}>
+                      {match.email}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Stack>
+          ) : null}
+
+          {target && matches.length === 1 ? (
+            <Alert severity="info">
+              Sending to <strong>{target.display_name}</strong> ({target.email}).
+            </Alert>
+          ) : null}
+
+          {inviting ? (
+            <Alert severity="info">
+              No account uses this address yet. We will email them an invitation, and the
+              request to join will be waiting for them when they sign up.
+            </Alert>
+          ) : null}
+
+          {target && !canAsk ? (
+            <Alert severity="warning">
+              An admin has turned join requests off here. You can still invite somebody
+              who is not on the platform yet.
+            </Alert>
+          ) : null}
+
+          {target ? (
+            <Field
+              label="Message"
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              errorText={fieldError('message')}
+              helperText="Optional. They see this with the request."
+              multiline
+              minRows={2}
+            />
+          ) : null}
         </Stack>
       </FormDialog>
 

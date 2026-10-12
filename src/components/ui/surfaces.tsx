@@ -123,6 +123,47 @@ export function SettingsSection({ title, description, action, children }: Settin
   );
 }
 
+export interface SettingsCardProps {
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+  children?: React.ReactNode;
+}
+
+/**
+ * The card counterpart of {@link SettingsSection}. Each block gets its own
+ * raised surface so related rows, actions and nested groups read as one unit
+ * instead of flowing into the next.
+ */
+export function SettingsCard({ title, description, action, children }: SettingsCardProps) {
+  return (
+    <Surface>
+      <Stack
+        direction="row"
+        spacing={2}
+        sx={{
+          mb: children ? 2.5 : 0,
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="h5" sx={{ letterSpacing: '-0.012em' }}>
+            {title}
+          </Typography>
+          {description ? (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
+              {description}
+            </Typography>
+          ) : null}
+        </Box>
+        {action}
+      </Stack>
+      {children}
+    </Surface>
+  );
+}
+
 export interface PageHeaderProps {
   eyebrow?: string;
   title: string;

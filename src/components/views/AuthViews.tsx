@@ -3,7 +3,7 @@
 import { Field, PasswordField } from '@/components/ui/inputs';
 import { Surface } from '@/components/ui/surfaces';
 import { errorMessage, isApiError } from '@/lib/api/client';
-import { googleSignInUrl } from '@/lib/api/auth';
+import { authApi, googleSignInUrl } from '@/lib/api/auth';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { radii } from '@/theme/tokens';
 import { useAppScheme } from '@/theme/useAppScheme';
@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -158,9 +158,24 @@ export function LoginView() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
+  const [resetNotice, setResetNotice] = useState(false);
 
   const fieldError = (field: string) =>
     isApiError(error) ? error.fieldError(field) : undefined;
+
+  /*
+   * The reset page sends the user here with `?reset=1` once the password is
+   * changed. It is read after mount and scrubbed from the address bar, so a
+   * reload cannot replay the notice.
+   */
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('reset') !== '1') return;
+    setResetNotice(true);
+    window.history.replaceState(null, '', window.location.pathname);
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -213,7 +228,16 @@ export function LoginView() {
         <GoogleButton />
         <AuthDivider label="or" />
         {error && !fieldError('email') && !fieldError('password') ? (
-          <Alert severity="error">{errorMessage(error, 'Could not sign you in.')}</Alert>
+          <Alert severity="error">
+            {isApiError(error) && error.isValidation
+              ? fieldError('non_field_errors') ?? 'Invalid email or password.'
+              : errorMessage(error, 'Could not sign you in.')}
+          </Alert>
+        ) : null}
+        {resetNotice ? (
+          <Alert severity="success">
+            Your password has been changed. Sign in with your new one.
+          </Alert>
         ) : null}
         <Field
           label="Email"
@@ -242,6 +266,16 @@ export function LoginView() {
           autoComplete="current-password"
           required
         />
+        <Box sx={{ textAlign: 'right', mt: -1.25 }}>
+          <Typography
+            component={Link}
+            href="/forgot-password"
+            variant="body2"
+            sx={{ color: 'primary.dark', fontWeight: 600 }}
+          >
+            Forgot password?
+          </Typography>
+        </Box>
         <Button
           type="submit"
           variant="contained"
@@ -273,6 +307,18 @@ export function SignUpView() {
 
   const fieldError = (field: string) =>
     isApiError(error) ? error.fieldError(field) : undefined;
+
+  /*
+   * An invitation email links here with the invited address, so the account the
+   * newcomer creates is the one the waiting join request is addressed to. Read
+   * after mount, matching the reset notice below.
+   */
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const invited = new URLSearchParams(window.location.search).get('email');
+    if (invited) setEmail(invited);
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -403,6 +449,278 @@ export function SignUpView() {
           sx={{ mt: 0.5, borderRadius: `${radii.pill}px` }}
         >
           {submitting ? 'Creating account…' : 'Create account'}
+        </Button>
+      </Stack>
+    </AuthCard>
+  );
+}
+
+/**
+ * Asks for the address to send a reset link to.
+ *
+ * The backend answers identically whether or not the address has an account, so
+ * the confirmation copy says "if" rather than confirming delivery - which is
+ * also why a failed request is the only way to tell the two apart, and is shown
+ * as an error rather than the success state.
+ */
+export function ForgotPasswordView() {
+  const { colors } = useAppScheme();
+  const [email, setEmail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
+
+  const fieldError = (field: string) =>
+    isApiError(error) ? error.fieldError(field) : undefined;
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    const emailValidationError = validateEmail(email);
+    setClientErrors(emailValidationError ? { email: emailValidationError } : {});
+    setError(null);
+    if (emailValidationError) return;
+
+    setSubmitting(true);
+    try {
+      await authApi.requestPasswordReset(email);
+      setSent(true);
+    } catch (caught) {
+      setError(caught);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (sent) {
+    return (
+      <AuthCard
+        eyebrow="Check your inbox"
+        title="Reset link sent"
+        description="It should arrive in a minute or two."
+        footer={
+          <Typography variant="body2" sx={{ color: colors.inkSoft }}>
+            Remembered it?{' '}
+            <Typography
+              component={Link}
+              href="/login"
+              variant="body2"
+              sx={{ color: 'primary.dark', fontWeight: 600 }}
+            >
+              Back to sign in
+            </Typography>
+          </Typography>
+        }
+      >
+        <Alert severity="success">
+          If {email.trim()} has an account, a link to choose a new password is on
+          its way. The link stops working once it is used.
+        </Alert>
+      </AuthCard>
+    );
+  }
+
+  return (
+    <AuthCard
+      eyebrow="Forgot password"
+      title="Reset your password"
+      description="We will email you a link to choose a new one."
+      footer={
+        <Typography variant="body2" sx={{ color: colors.inkSoft }}>
+          Remembered it?{' '}
+          <Typography
+            component={Link}
+            href="/login"
+            variant="body2"
+            sx={{ color: 'primary.dark', fontWeight: 600 }}
+          >
+            Back to sign in
+          </Typography>
+        </Typography>
+      }
+    >
+      <Stack component="form" spacing={2.25} onSubmit={handleSubmit} noValidate>
+        {error && !fieldError('email') ? (
+          <Alert severity="error">
+            {errorMessage(error, 'Could not send the reset link.')}
+          </Alert>
+        ) : null}
+        <Field
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(event) => {
+            setEmail(event.target.value);
+            setError(null);
+            setClientErrors((current) => ({ ...current, email: '' }));
+          }}
+          errorText={clientErrors.email || fieldError('email')}
+          autoComplete="email"
+          autoFocus
+          required
+          slotProps={{ htmlInput: { maxLength: 254 } }}
+        />
+        <Button
+          type="submit"
+          variant="contained"
+          size="large"
+          fullWidth
+          disabled={submitting || !email}
+          sx={{ mt: 0.5, borderRadius: `${radii.pill}px` }}
+        >
+          {submitting ? 'Sending…' : 'Send reset link'}
+        </Button>
+      </Stack>
+    </AuthCard>
+  );
+}
+
+interface ResetLink {
+  uid: string;
+  token: string;
+}
+
+/**
+ * Collects the new password for a link opened from an email.
+ *
+ * The uid and token arrive on the query string. They are read after mount
+ * rather than during render, because the page is server rendered and `window`
+ * does not exist yet - and `useSearchParams` would force the whole route out of
+ * static rendering.
+ */
+export function ResetPasswordView() {
+  const router = useRouter();
+  const { colors } = useAppScheme();
+  const [link, setLink] = useState<ResetLink | null>(null);
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setLink({ uid: params.get('uid') ?? '', token: params.get('token') ?? '' });
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const fieldError = (field: string) =>
+    isApiError(error) ? error.fieldError(field) : undefined;
+
+  const confirmError = confirm && password !== confirm ? 'Passwords do not match.' : undefined;
+  const validLink = Boolean(link?.uid && link?.token);
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!link || !validLink) return;
+
+    const validationErrors: Record<string, string> = {};
+    const passwordValidationError = validateNewPassword(password);
+    if (passwordValidationError) validationErrors.password = passwordValidationError;
+    if (password !== confirm) validationErrors.confirm = 'Passwords do not match.';
+    setClientErrors(validationErrors);
+    setError(null);
+    if (Object.keys(validationErrors).length > 0) return;
+
+    setSubmitting(true);
+    try {
+      await authApi.confirmPasswordReset({
+        uid: link.uid,
+        token: link.token,
+        new_password: password,
+      });
+      // The login page reads `?reset=1` and reassures the user there.
+      router.replace('/login?reset=1');
+    } catch (caught) {
+      setError(caught);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (link && !validLink) {
+    return (
+      <AuthCard
+        eyebrow="Link problem"
+        title="This link is incomplete"
+        description="Reset links carry a one-time code, and part of it is missing."
+        footer={
+          <Typography variant="body2" sx={{ color: colors.inkSoft }}>
+            <Typography
+              component={Link}
+              href="/forgot-password"
+              variant="body2"
+              sx={{ color: 'primary.dark', fontWeight: 600 }}
+            >
+              Request a new link
+            </Typography>
+          </Typography>
+        }
+      >
+        <Alert severity="error">
+          Request a fresh reset email and open the newest link.
+        </Alert>
+      </AuthCard>
+    );
+  }
+
+  return (
+    <AuthCard
+      eyebrow="Almost there"
+      title="Choose a new password"
+      description="Then you can sign in with it right away."
+      footer={
+        <Typography variant="body2" sx={{ color: colors.inkSoft }}>
+          <Typography
+            component={Link}
+            href="/forgot-password"
+            variant="body2"
+            sx={{ color: 'primary.dark', fontWeight: 600 }}
+          >
+            Request a new link
+          </Typography>
+        </Typography>
+      }
+    >
+      <Stack component="form" spacing={2.25} onSubmit={handleSubmit} noValidate>
+        {error && !fieldError('token') && !fieldError('new_password') ? (
+          <Alert severity="error">{errorMessage(error, 'Could not reset your password.')}</Alert>
+        ) : null}
+        {fieldError('token') ? (
+          <Alert severity="error">{fieldError('token')}</Alert>
+        ) : null}
+        <PasswordField
+          label="New password"
+          value={password}
+          onChange={(value) => {
+            setPassword(value);
+            setError(null);
+            setClientErrors((current) => ({ ...current, password: '' }));
+          }}
+          errorText={clientErrors.password || fieldError('new_password')}
+          helperText="At least 8 characters, including a letter and a number."
+          autoComplete="new-password"
+        />
+        <PasswordField
+          label="Confirm password"
+          value={confirm}
+          onChange={(value) => {
+            setConfirm(value);
+            setClientErrors((current) => ({ ...current, confirm: '' }));
+          }}
+          errorText={clientErrors.confirm || confirmError}
+          autoComplete="new-password"
+        />
+        <Button
+          type="submit"
+          variant="contained"
+          size="large"
+          fullWidth
+          disabled={submitting || !password || !confirm}
+          sx={{ mt: 0.5, borderRadius: `${radii.pill}px` }}
+        >
+          {submitting ? 'Saving…' : 'Set new password'}
         </Button>
       </Stack>
     </AuthCard>

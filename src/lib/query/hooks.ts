@@ -398,19 +398,21 @@ export function useMyJoinRequests(scope?: JoinRequestScope) {
   });
 }
 
-export function useGroupInvitations(groupId: string | undefined) {
+/**
+ * The composer's search-as-you-type. The caller debounces `query`; a miss
+ * resolves to an empty list, which is what the composer reads as "there is no
+ * account here, offer an invitation". Disabled below two characters so opening
+ * the field does not fire a query.
+ */
+export function useMemberLookup(
+  groupId: string | undefined,
+  query: string,
+  enabled = true,
+) {
   return useQuery({
-    queryKey: groupKeys.invitations(groupId ?? ''),
-    queryFn: ({ signal }) => invitationsApi.list(groupId as string, signal),
-    enabled: Boolean(groupId),
-  });
-}
-
-/** The caller's own pending invitations, matched on their email. */
-export function useMyInvitations() {
-  return useQuery({
-    queryKey: groupKeys.myInvitations,
-    queryFn: ({ signal }) => invitationsApi.mine(signal),
+    queryKey: groupKeys.memberLookup(groupId ?? '', query),
+    queryFn: ({ signal }) => groupsApi.lookupMembers(groupId as string, query, signal),
+    enabled: Boolean(groupId) && enabled && query.trim().length >= 2,
   });
 }
 
@@ -588,27 +590,6 @@ export function useSendInvitation() {
     mutationFn: ({ groupId, input }: { groupId: string; input: InvitationCreate }) =>
       invitationsApi.create(groupId, input),
     onSuccess: (_invitation, variables) => invalidate(variables.groupId),
-  });
-}
-
-export function useRevokeInvitation() {
-  const invalidate = useInvalidateGroupViews();
-  return useMutation({
-    mutationFn: ({ groupId, invitationId }: { groupId: string; invitationId: string }) =>
-      invitationsApi.revoke(groupId, invitationId),
-    onSuccess: (_result, variables) => invalidate(variables.groupId),
-  });
-}
-
-export function useAcceptInvitation() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (token: string) => invitationsApi.accept(token),
-    onSuccess: () => {
-      // Claiming an invitation makes a group visible to the caller for the first
-      // time, so the group list, detail and roster are all stale.
-      void queryClient.invalidateQueries({ queryKey: groupKeys.all });
-    },
   });
 }
 

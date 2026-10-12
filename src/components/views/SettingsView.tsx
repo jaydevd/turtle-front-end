@@ -2,23 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Alert, Box, Button, Divider, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, Divider, IconButton, Stack, Typography } from '@mui/material';
 import LogoutRounded from '@mui/icons-material/LogoutRounded';
-import CloudOutlined from '@mui/icons-material/CloudOutlined';
 import GoogleIcon from '@mui/icons-material/Google';
-import { PageHeader, Section, Surface, DetailRow } from '@/components/ui/surfaces';
+import EditOutlined from '@mui/icons-material/EditOutlined';
+import { PageHeader, SettingsCard, DetailRow } from '@/components/ui/surfaces';
 import { Field, PasswordField, SegmentedControl } from '@/components/ui/inputs';
-import { ConfirmDialog } from '@/components/ui/dialogs';
+import { ConfirmDialog, FormDialog } from '@/components/ui/dialogs';
 import { useToast } from '@/components/feedback/ToastProvider';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { useThemeMode, type ThemeMode } from '@/theme/ThemeModeProvider';
-import { API_BASE_URL, errorMessage, isApiError } from '@/lib/api/client';
+import { errorMessage, isApiError } from '@/lib/api/client';
 import { profileApi } from '@/lib/api/profile';
 import { formatShortDate } from '@/lib/date';
 import { useAppScheme } from '@/theme/useAppScheme';
-import { statusLabels } from '@/components/ui/pills';
 import { radii } from '@/theme/tokens';
-import { tabularNums } from '@/theme/typography';
 import {
   useUpdateProfile,
   useSetPassword,
@@ -36,196 +34,16 @@ const THEME_OPTIONS: Array<{ value: ThemeMode; label: string }> = [
 const NAME_MAX_LENGTH = 150;
 
 /**
- * First and last name are the only self-editable fields the backend exposes, so
- * this form deliberately leaves every other account detail read-only below it.
+ * Destructive actions stay quiet on the page: a soft red wash that only deepens
+ * on hover, rather than a full-bleed alert colour.
  */
-function ProfileForm({ user }: { user: User }) {
-  const { updateUser } = useAuth();
-  const { toast } = useToast();
-  const { colors } = useAppScheme();
-  const updateProfile = useUpdateProfile();
-
-  // Seeded once from the cached user. The parent keys this component on the
-  // stored names, so a successful save remounts it with the server values
-  // rather than syncing props into state through an effect.
-  const [firstName, setFirstName] = useState(user.first_name);
-  const [lastName, setLastName] = useState(user.last_name);
-  const [error, setError] = useState<unknown>(null);
-
-  const trimmedFirst = firstName.trim();
-  const trimmedLast = lastName.trim();
-  const unchanged =
-    trimmedFirst === user.first_name && trimmedLast === user.last_name;
-
-  const fieldError = (field: 'first_name' | 'last_name') =>
-    isApiError(error) ? error.fieldError(field) : undefined;
-
-  const hasFieldError = Boolean(fieldError('first_name') || fieldError('last_name'));
-
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    setError(null);
-    try {
-      const updated = await updateProfile.mutateAsync({
-        first_name: trimmedFirst,
-        last_name: trimmedLast,
-      });
-      // Both caches are updated: the query cache for this screen and the
-      // persisted user that the shell greets from.
-      updateUser(updated);
-      toast({ tone: 'success', message: 'Name updated.' });
-    } catch (caught) {
-      setError(caught);
-    }
-  }
-
-  return (
-    <Stack component="form" spacing={2.25} onSubmit={handleSubmit} noValidate>
-      {error && !hasFieldError ? (
-        <Alert severity="error">{errorMessage(error, 'Could not update your name.')}</Alert>
-      ) : null}
-
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-        <Field
-          label="First name"
-          value={firstName}
-          onChange={(event) => {
-            setFirstName(event.target.value);
-            setError(null);
-          }}
-          errorText={fieldError('first_name')}
-          autoComplete="given-name"
-          slotProps={{ htmlInput: { maxLength: NAME_MAX_LENGTH } }}
-        />
-        <Field
-          label="Last name"
-          value={lastName}
-          onChange={(event) => {
-            setLastName(event.target.value);
-            setError(null);
-          }}
-          errorText={fieldError('last_name')}
-          autoComplete="family-name"
-          slotProps={{ htmlInput: { maxLength: NAME_MAX_LENGTH } }}
-        />
-      </Stack>
-
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-        <Button
-          type="submit"
-          variant="contained"
-          disabled={updateProfile.isPending || unchanged}
-          sx={{ borderRadius: `${radii.pill}px` }}
-        >
-          {updateProfile.isPending ? 'Saving…' : 'Save name'}
-        </Button>
-        {unchanged && !updateProfile.isPending ? (
-          <Typography variant="caption" sx={{ color: colors.inkSoft }}>
-            No changes to save.
-          </Typography>
-        ) : null}
-      </Stack>
-    </Stack>
-  );
-}
-
-/**
- * An account created through Google has no password at all, so this is the only
- * way it can ever sign in with one too. It disappears once a password exists:
- * changing one after that needs the current password, and this form has no field
- * for it.
- */
-function PasswordForm() {
-  const { updateUser } = useAuth();
-  const { toast } = useToast();
-  const { colors } = useAppScheme();
-  const setPassword = useSetPassword();
-
-  const [password, setPasswordValue] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [error, setError] = useState<unknown>(null);
-
-  const fieldError = (field: string) =>
-    isApiError(error) ? error.fieldError(field) : undefined;
-
-  const confirmError = confirm && password !== confirm ? 'Passwords do not match.' : undefined;
-  const ready = password.length > 0 && password === confirm;
-
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    if (!ready) return;
-
-    setError(null);
-    try {
-      // The response is the refreshed user, so the persisted copy - the one the
-      // shell greets from - learns the account has a password now.
-      const updated = await setPassword.mutateAsync({ new_password: password });
-      updateUser(updated);
-      toast({ tone: 'success', message: 'Password set.' });
-    } catch (caught) {
-      setError(caught);
-    }
-  }
-
-  return (
-    <Stack component="form" spacing={2.25} onSubmit={handleSubmit} noValidate>
-      <Box>
-        <Typography variant="h5" sx={{ fontSize: '1.0625rem' }}>
-          Set a password
-        </Typography>
-        <Typography variant="body2" sx={{ color: colors.inkSoft, mt: 0.5, maxWidth: 460 }}>
-          You signed in with Google, so this account has no password yet. Add one to sign in with
-          your email address too.
-        </Typography>
-      </Box>
-
-      {error && !fieldError('new_password') ? (
-        <Alert severity="error">{errorMessage(error, 'Could not set your password.')}</Alert>
-      ) : null}
-
-      <Box sx={{ maxWidth: 420 }}>
-        <PasswordField
-          label="New password"
-          value={password}
-          onChange={(value) => {
-            setPasswordValue(value);
-            setError(null);
-          }}
-          errorText={fieldError('new_password')}
-          helperText="At least 8 characters, including a letter and a number."
-          autoComplete="new-password"
-        />
-      </Box>
-
-      <Box sx={{ maxWidth: 420 }}>
-        <PasswordField
-          label="Confirm password"
-          value={confirm}
-          onChange={(value) => {
-            setConfirm(value);
-            setError(null);
-          }}
-          errorText={confirmError}
-          autoComplete="new-password"
-        />
-      </Box>
-
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-        <Button
-          type="submit"
-          variant="contained"
-          disabled={setPassword.isPending || !ready}
-          sx={{ borderRadius: `${radii.pill}px` }}
-        >
-          {setPassword.isPending ? 'Saving…' : 'Set password'}
-        </Button>
-        <Typography variant="caption" sx={{ color: colors.inkSoft }}>
-          Google sign in keeps working either way.
-        </Typography>
-      </Stack>
-    </Stack>
-  );
-}
+const destructiveButtonSx = {
+  backgroundColor: 'color-mix(in srgb, var(--mui-palette-error-main) 14%, transparent)',
+  color: 'var(--mui-palette-error-main)',
+  '&:hover': {
+    backgroundColor: 'color-mix(in srgb, var(--mui-palette-error-main) 22%, transparent)',
+  },
+};
 
 /**
  * Why a connect round trip can come back without a connection. Anything
@@ -320,68 +138,61 @@ function GoogleAccount({ user }: { user: User }) {
   }
 
   return (
-    <Section
-      title="Google account"
-      description={
-        user.google_connected
-          ? 'Google is linked to this account, so it can be used to sign in alongside your email and password.'
-          : 'Link a Google account to be able to sign in with it in future. Your current way of signing in keeps working either way.'
-      }
-    >
-      <Stack divider={<Divider />} spacing={2.5}>
-        {notice ? <Alert severity="error">{notice}</Alert> : null}
-        {error ? (
-          <Alert severity="error">
-            {errorMessage(error, 'Could not update the Google connection.')}
-          </Alert>
-        ) : null}
-
+    <Box>
+      <Stack
+        direction="row"
+        spacing={2}
+        sx={{ alignItems: 'flex-start', justifyContent: 'space-between' }}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="h6" sx={{ fontSize: '1rem' }}>
+            Google account
+          </Typography>
+          <Typography variant="body2" sx={{ color: colors.inkSoft, mt: 0.35 }}>
+            {user.google_connected
+              ? user.google_email ?? 'Connected to Google'
+              : 'Not connected'}
+          </Typography>
+        </Box>
         {user.google_connected ? (
-          <>
-            <DetailRow label="Connected as" value={user.google_email ?? 'Google account'} />
-            <Stack
-              direction={{ xs: 'column', sm: 'row' }}
-              spacing={2}
-              sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}
-            >
-              <Typography variant="body2" sx={{ color: colors.inkSoft, maxWidth: 420 }}>
-                {needsPassword
-                  ? 'Set a password first, so Google is not the only way back into this account.'
-                  : 'Disconnecting stops Google sign in for this account. You can link it again at any time.'}
-              </Typography>
-              <Button
-                variant="outlined"
-                color="error"
-                onClick={() => setConfirming(true)}
-                disabled={needsPassword || disconnect.isPending}
-                sx={{ flexShrink: 0 }}
-              >
-                Disconnect
-              </Button>
-            </Stack>
-          </>
-        ) : (
-          <Stack
-            direction={{ xs: 'column', sm: 'row' }}
-            spacing={2}
-            sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}
+          <Button
+            variant="text"
+            color="error"
+            onClick={() => setConfirming(true)}
+            disabled={needsPassword || disconnect.isPending}
+            sx={[destructiveButtonSx, { flexShrink: 0 }]}
           >
-            <Typography variant="body2" sx={{ color: colors.inkSoft, maxWidth: 420 }}>
-              You will choose the Google account on Google&apos;s own consent screen, and can
-              withdraw access from your Google account at any time.
-            </Typography>
-            <Button
-              variant="contained"
-              startIcon={<GoogleIcon />}
-              onClick={handleConnect}
-              disabled={linkStart.isPending}
-              sx={{ flexShrink: 0, borderRadius: `${radii.pill}px` }}
-            >
-              {linkStart.isPending ? 'Opening Google…' : 'Connect to Google'}
-            </Button>
-          </Stack>
+            Disconnect
+          </Button>
+        ) : (
+          <Button
+            variant="contained"
+            startIcon={<GoogleIcon />}
+            onClick={handleConnect}
+            disabled={linkStart.isPending}
+            sx={{ flexShrink: 0, borderRadius: `${radii.pill}px` }}
+          >
+            {linkStart.isPending ? 'Opening…' : 'Connect'}
+          </Button>
         )}
       </Stack>
+
+      {user.google_connected && needsPassword ? (
+        <Typography variant="caption" sx={{ color: colors.inkSoft, display: 'block', mt: 1 }}>
+          Set a password before disconnecting.
+        </Typography>
+      ) : null}
+
+      {notice ? (
+        <Alert severity="error" sx={{ mt: 1.5 }}>
+          {notice}
+        </Alert>
+      ) : null}
+      {error ? (
+        <Alert severity="error" sx={{ mt: 1.5 }}>
+          {errorMessage(error, 'Could not update the Google connection.')}
+        </Alert>
+      ) : null}
 
       <ConfirmDialog
         open={confirming}
@@ -393,17 +204,101 @@ function GoogleAccount({ user }: { user: User }) {
         onConfirm={handleDisconnect}
         onClose={() => setConfirming(false)}
       />
-    </Section>
+    </Box>
   );
 }
 
 export function SettingsView() {
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, signOut, updateUser } = useAuth();
   const { preference, setPreference } = useThemeMode();
   const { colors } = useAppScheme();
   const { toast } = useToast();
+  const updateProfile = useUpdateProfile();
   const [signingOut, setSigningOut] = useState(false);
+
+  const [nameOpen, setNameOpen] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [nameError, setNameError] = useState<unknown>(null);
+
+  const setPassword = useSetPassword();
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState<unknown>(null);
+
+  const fullName = user
+    ? [user.first_name, user.last_name].filter(Boolean).join(' ') || 'No name set'
+    : '';
+
+  const nameFieldError = (field: 'first_name' | 'last_name') =>
+    isApiError(nameError) ? nameError.fieldError(field) : undefined;
+
+  const passwordFieldError = (field: string) =>
+    isApiError(passwordError) ? passwordError.fieldError(field) : undefined;
+
+  const confirmPasswordError =
+    confirmPassword && newPassword !== confirmPassword ? 'Passwords do not match.' : undefined;
+
+  const passwordReady = Boolean(
+    newPassword.length > 0 &&
+      newPassword === confirmPassword &&
+      (!user?.has_password || currentPassword.length > 0),
+  );
+
+  function openNameEdit() {
+    if (!user) return;
+    setFirstName(user.first_name);
+    setLastName(user.last_name);
+    setNameError(null);
+    setNameOpen(true);
+  }
+
+  function openPasswordEdit() {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError(null);
+    setPasswordOpen(true);
+  }
+
+  async function handleSavePassword() {
+    if (!user || !passwordReady) return;
+    setPasswordError(null);
+    try {
+      // The response is the refreshed user, so `has_password` flips in the cache
+      // and the persisted copy the shell greets from.
+      const updated = await setPassword.mutateAsync({
+        new_password: newPassword,
+        ...(user.has_password ? { current_password: currentPassword } : {}),
+      });
+      updateUser(updated);
+      toast({
+        tone: 'success',
+        message: user.has_password ? 'Password changed.' : 'Password set.',
+      });
+      setPasswordOpen(false);
+    } catch (caught) {
+      setPasswordError(caught);
+    }
+  }
+
+  async function handleSaveName() {
+    setNameError(null);
+    try {
+      const updated = await updateProfile.mutateAsync({
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+      });
+      updateUser(updated);
+      toast({ tone: 'success', message: 'Name updated.' });
+      setNameOpen(false);
+    } catch (caught) {
+      setNameError(caught);
+    }
+  }
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -417,18 +312,15 @@ export function SettingsView() {
   }
 
   return (
-    <>
+    <Box sx={{ maxWidth: 760, mx: 'auto' }}>
       <PageHeader
         eyebrow="Preferences"
         title="Settings"
-        description="Appearance, account details and the session behind this device."
+        description="Appearance, account and sign out."
       />
 
       <Stack spacing={3}>
-        <Section
-          title="Appearance"
-          description="System follows your device setting. The choice is stored on this device only."
-        >
+        <SettingsCard title="Appearance" description="Stored on this device.">
           <Box sx={{ maxWidth: 360 }}>
             <SegmentedControl
               ariaLabel="Colour scheme"
@@ -438,15 +330,34 @@ export function SettingsView() {
               fullWidth
             />
           </Box>
-        </Section>
+        </SettingsCard>
 
-        <Section title="Account" description="Your name is used as the greeting in the app. Email and role are fixed.">
+        <SettingsCard title="Account">
           {user ? (
             <Stack divider={<Divider />} spacing={2.5}>
-              <ProfileForm
-                key={`${user.first_name}:${user.last_name}`}
-                user={user}
-              />
+              <Stack
+                direction="row"
+                spacing={2}
+                sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+              >
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  Name
+                </Typography>
+                <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', minWidth: 0 }}>
+                  <IconButton
+                    size="small"
+                    edge="start"
+                    onClick={openNameEdit}
+                    aria-label="Edit name"
+                    sx={{ color: colors.primaryInk }}
+                  >
+                    <EditOutlined sx={{ fontSize: 15 }} />
+                  </IconButton>
+                  <Typography noWrap variant="body2" sx={{ fontWeight: 600 }}>
+                    {fullName}
+                  </Typography>
+                </Stack>
+              </Stack>
               <DetailRow label="Email" value={user.email} />
               <DetailRow
                 label="Role"
@@ -460,80 +371,146 @@ export function SettingsView() {
                 }
               />
               <DetailRow label="Member since" value={formatShortDate(user.created_at)} />
-              <DetailRow
-                label="User ID"
-                value={
-                  <Box
-                    component="span"
-                    sx={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', ...tabularNums }}
-                  >
-                    {user.id}
-                  </Box>
-                }
-              />
-              {!user.has_password ? <PasswordForm /> : null}
+              <Stack
+                direction="row"
+                spacing={2}
+                sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+              >
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  Password
+                </Typography>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={openPasswordEdit}
+                  sx={{ color: colors.primaryInk, fontWeight: 600, flexShrink: 0 }}
+                >
+                  {user.has_password ? 'Change' : 'Set password'}
+                </Button>
+              </Stack>
+
+              <GoogleAccount user={user} />
             </Stack>
           ) : (
             <Typography variant="body2" sx={{ color: colors.inkSoft }}>
               No account loaded.
             </Typography>
           )}
-        </Section>
+        </SettingsCard>
 
-        {user ? <GoogleAccount user={user} /> : null}
-
-        <Section title="Session" description="Signing out clears the tokens on this device.">
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}>
-            <Typography variant="body2" sx={{ color: colors.inkSoft, maxWidth: 420 }}>
-              The backend does not blacklist refresh tokens, so signing out removes them locally.
-              Anyone with the old token could still use it until it expires.
-            </Typography>
+        <SettingsCard
+          title="Log out"
+          description="Remove the tokens stored on this device."
+          action={
             <Button
-              variant="outlined"
+              variant="text"
               color="error"
               startIcon={<LogoutRounded />}
               onClick={handleSignOut}
               disabled={signingOut}
-              sx={{ flexShrink: 0 }}
+              sx={[destructiveButtonSx, { flexShrink: 0 }]}
             >
               {signingOut ? 'Signing out…' : 'Sign out'}
             </Button>
-          </Stack>
-        </Section>
-
-        <Surface>
-          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
-            <Box
-              sx={{
-                width: 34,
-                height: 34,
-                borderRadius: '10px',
-                display: 'grid',
-                placeItems: 'center',
-                backgroundColor: colors.primaryWash,
-                color: colors.primaryInk,
-                flexShrink: 0,
-              }}
-            >
-              <CloudOutlined sx={{ fontSize: 17 }} />
-            </Box>
-            <Box>
-              <Typography variant="h5">API connection</Typography>
-              <Typography variant="body2" sx={{ color: colors.inkSoft, mt: 0.5 }}>
-                Requests go to{' '}
-                <Box component="span" sx={{ fontFamily: 'var(--font-mono)', fontSize: '0.8125rem' }}>
-                  {API_BASE_URL}
-                </Box>
-                , proxied through the Next.js server to Django. Timestamps are Unix seconds and days
-                are UTC midnight.
-              </Typography>
-              <Typography variant="caption" sx={{ color: colors.inkSoft, display: 'block', mt: 1 }}>
-                {`Habit statuses: ${statusLabels.ACTIVE}, ${statusLabels.COMPLETED}, ${statusLabels.PARTIAL}, ${statusLabels.MISSED} and ${statusLabels.SKIPPED}.`}
-              </Typography>
-            </Box>
-          </Stack>
-        </Surface>
+          }
+        />
       </Stack>
-    </>
+
+      <FormDialog
+        open={nameOpen}
+        title="Edit name"
+        confirmLabel="Save changes"
+        busy={updateProfile.isPending}
+        onConfirm={handleSaveName}
+        onClose={() => setNameOpen(false)}
+      >
+        {nameError && !nameFieldError('first_name') && !nameFieldError('last_name') ? (
+          <Alert severity="error">{errorMessage(nameError, 'Could not update your name.')}</Alert>
+        ) : null}
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <Field
+            label="First name"
+            value={firstName}
+            onChange={(event) => {
+              setFirstName(event.target.value);
+              setNameError(null);
+            }}
+            errorText={nameFieldError('first_name')}
+            autoComplete="given-name"
+            autoFocus
+            slotProps={{ htmlInput: { maxLength: NAME_MAX_LENGTH } }}
+          />
+          <Field
+            label="Last name"
+            value={lastName}
+            onChange={(event) => {
+              setLastName(event.target.value);
+              setNameError(null);
+            }}
+            errorText={nameFieldError('last_name')}
+            autoComplete="family-name"
+            slotProps={{ htmlInput: { maxLength: NAME_MAX_LENGTH } }}
+          />
+        </Stack>
+      </FormDialog>
+
+      <FormDialog
+        open={passwordOpen}
+        title={user?.has_password ? 'Change password' : 'Set password'}
+        description={
+          user?.has_password
+            ? 'Enter your current password, then choose a new one.'
+            : 'Your Google sign in keeps working either way.'
+        }
+        confirmLabel={user?.has_password ? 'Change password' : 'Set password'}
+        busy={setPassword.isPending}
+        disabled={!passwordReady}
+        onConfirm={handleSavePassword}
+        onClose={() => setPasswordOpen(false)}
+      >
+        {passwordError &&
+        !passwordFieldError('current_password') &&
+        !passwordFieldError('new_password') ? (
+          <Alert severity="error">
+            {errorMessage(passwordError, 'Could not update your password.')}
+          </Alert>
+        ) : null}
+        <Stack spacing={2.25}>
+          {user?.has_password ? (
+            <PasswordField
+              label="Current password"
+              value={currentPassword}
+              onChange={(value) => {
+                setCurrentPassword(value);
+                setPasswordError(null);
+              }}
+              errorText={passwordFieldError('current_password')}
+              autoComplete="current-password"
+            />
+          ) : null}
+          <PasswordField
+            label="New password"
+            value={newPassword}
+            onChange={(value) => {
+              setNewPassword(value);
+              setPasswordError(null);
+            }}
+            errorText={passwordFieldError('new_password')}
+            helperText="At least 8 characters, including a letter and a number."
+            autoComplete="new-password"
+          />
+          <PasswordField
+            label="Confirm password"
+            value={confirmPassword}
+            onChange={(value) => {
+              setConfirmPassword(value);
+              setPasswordError(null);
+            }}
+            errorText={confirmPasswordError}
+            autoComplete="new-password"
+          />
+        </Stack>
+      </FormDialog>
+    </Box>
   );
 }

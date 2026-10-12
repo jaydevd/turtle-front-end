@@ -38,6 +38,9 @@ export const groupKeys = {
   list: ['groups', 'list'] as const,
   detail: (id: string) => ['groups', 'detail', id] as const,
   members: (id: string) => ['groups', 'members', id] as const,
+  /** The composer's search-as-you-type, keyed by the typed address. */
+  memberLookup: (id: string, query: string) =>
+    ['groups', 'member-lookup', id, query] as const,
   joinRequests: (id: string, scope?: JoinRequestScope) =>
     ['groups', 'join-requests', id, scope ?? 'all'] as const,
   /**
@@ -46,9 +49,6 @@ export const groupKeys = {
    */
   myJoinRequests: (scope?: JoinRequestScope) =>
     ['groups', 'join-requests', 'mine', scope ?? 'all'] as const,
-  /** `mine` is the caller's inbox, so it sits in the same branch but never collides. */
-  myInvitations: ['groups', 'invitations', 'mine'] as const,
-  invitations: (id: string) => ['groups', 'invitations', id] as const,
   /**
    * Parent of every challenge-list query for one group, whatever the status
    * filter. Invalidation needs this prefix: `challenges(id)` resolves to the

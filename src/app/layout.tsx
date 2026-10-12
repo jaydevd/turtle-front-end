@@ -2,6 +2,7 @@ import { InitColorSchemeScript } from '@mui/material';
 import type { Metadata, Viewport } from 'next';
 import { Fraunces, Inter_Tight, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
+import { DEFAULT_SCHEME } from '@/theme/tokens';
 import { AppProviders } from './providers';
 
 /**
@@ -57,8 +58,8 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* Applies the stored theme before paint, avoiding a flash of light. */}
-        <InitColorSchemeScript attribute="data-mui-color-scheme" />
+        {/* Applies the stored theme before paint, avoiding a flash of the wrong scheme. */}
+        <InitColorSchemeScript attribute="data-mui-color-scheme" defaultMode={DEFAULT_SCHEME} />
       </head>
       <body>
         <AppProviders>{children}</AppProviders>

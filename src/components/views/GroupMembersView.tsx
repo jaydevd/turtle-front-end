@@ -2,34 +2,28 @@
 
 import { useState } from 'react';
 import { Box, CircularProgress, Stack } from '@mui/material';
-import { InvitationPanel } from '@/components/groups/InvitationPanel';
 import { JoinRequestPanel } from '@/components/groups/JoinRequestPanel';
 import { MemberRoster } from '@/components/groups/MemberRoster';
 import { BackLink } from '@/components/ui/BackLink';
 import { ErrorState, InlineEmpty, PageHeader, Section } from '@/components/ui/surfaces';
 import { errorMessage } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth/AuthContext';
-import {
-    useGroup,
-    useGroupInvitations,
-    useGroupMembers,
-    useJoinRequests,
-} from '@/lib/query/hooks';
+import { useGroup, useGroupMembers, useJoinRequests } from '@/lib/query/hooks';
 import type { JoinRequestScope } from '@/types/api';
 
 /**
- * `/groups/<id>/members` - the roster and the two ways people get into the
- * group, on one page.
+ * `/groups/<id>/members` - the roster and the way people get into the group, on
+ * one page.
  *
- * Requests and invitations moved here from the group's detail tabs: they are
- * both about who may join, so they belong next to the roster rather than next
- * to the challenges.
+ * Requests moved here from the group's detail tabs: they are about who may
+ * join, so they belong next to the roster rather than next to the challenges.
+ * Invitations are folded into the same panel, since an invitation is just a
+ * request aimed at an address that has no account yet.
  */
 export function GroupMembersView({ groupId }: { groupId: string }) {
   const { user } = useAuth();
   const group = useGroup(groupId);
   const members = useGroupMembers(groupId);
-  const invitations = useGroupInvitations(groupId);
   const [scope, setScope] = useState<JoinRequestScope>('incoming');
   const requests = useJoinRequests(groupId, scope);
 
@@ -71,7 +65,7 @@ export function GroupMembersView({ groupId }: { groupId: string }) {
       <PageHeader
         eyebrow="Group members"
         title={data.name}
-        description="Who is in the group, the requests to join, and the invitations sent out."
+        description="Who is in the group, and the requests to join it - whether the address already has an account or was invited to make one."
       />
       <Stack spacing={3}>
         <Section title="Members" description={`${data.member_count} people in this group`}>
@@ -87,7 +81,7 @@ export function GroupMembersView({ groupId }: { groupId: string }) {
           )}
         </Section>
 
-        <Section title="Requests">
+        <Section title="Requests and invitations">
           <JoinRequestPanel
             group={data}
             requests={requests.data?.results ?? []}
@@ -96,14 +90,6 @@ export function GroupMembersView({ groupId }: { groupId: string }) {
             isAdmin={Boolean(isAdmin)}
             scope={scope}
             onScopeChange={setScope}
-          />
-        </Section>
-
-        <Section title="Invitations">
-          <InvitationPanel
-            group={data}
-            invitations={invitations.data?.results ?? []}
-            loading={invitations.isPending}
           />
         </Section>
       </Stack>

@@ -1,23 +1,14 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import {
-  Alert,
-  Box,
-  Button,
-  MenuItem,
-  Stack,
-  Typography,
-} from '@mui/material';
-import { Field, SelectField, SegmentedControl, WeekdayToggle, ColorSwatchPicker, IconPicker, NumberStepper } from '@/components/ui/inputs';
+import { defaultIconKey, isValidIcon } from '@/components/ui/HabitIcon';
+import { ColorSwatchPicker, Field, IconPicker, NumberStepper, SegmentedControl, SelectField, WeekdayToggle } from '@/components/ui/inputs';
 import { Section } from '@/components/ui/surfaces';
 import { errorMessage, isApiError } from '@/lib/api/client';
+import { fromApiTime, fromDateInputValue, toApiTime, toDateInputValue } from '@/lib/date';
 import { useCreateTag } from '@/lib/query/hooks';
 import { frequencyOptions } from '@/lib/schedule';
-import { fromApiTime, toApiTime, fromDateInputValue, toDateInputValue } from '@/lib/date';
 import { habitSwatches, layout as layoutTokens } from '@/theme/tokens';
 import { useAppScheme } from '@/theme/useAppScheme';
-import { defaultIconKey, isValidIcon } from '@/components/ui/HabitIcon';
 import type {
   DurationType,
   FrequencyType,
@@ -28,6 +19,15 @@ import type {
   Tag,
   Weekday,
 } from '@/types/api';
+import {
+  Alert,
+  Box,
+  Button,
+  MenuItem,
+  Stack,
+  Typography,
+} from '@mui/material';
+import { useMemo, useState } from 'react';
 
 export interface HabitFormProps {
   mode: 'create' | 'edit';
@@ -40,7 +40,7 @@ export interface HabitFormProps {
 }
 
 const DURATION_OPTIONS: Array<{ value: DurationType; label: string }> = [
-  { value: 'INDEFINITE', label: 'Ongoing' },
+  { value: 'INDEFINITE', label: 'Forever' },
   { value: 'FIXED', label: 'Fixed period' },
 ];
 
@@ -190,10 +190,10 @@ export function HabitForm({
               slotProps={{ htmlInput: { maxLength: 255 } }}
             />
             <Field
-              label="Goal"
+              label="Goal (optional)"
               value={goal}
               onChange={(event) => setGoal(event.target.value)}
-              helperText="Optional. A sentence about what success looks like."
+              // helperText=""
               multiline
               minRows={2}
             />
@@ -205,7 +205,7 @@ export function HabitForm({
                   value={tagId}
                   onChange={(event) => setTagId(event.target.value)}
                   errorText={combinedError('tag')}
-                  helperText="Habits are grouped by tag."
+                  // helperText="Habits are grouped by tag."
                 >
                   {tags.map((tag) => (
                     <MenuItem key={tag.id} value={tag.id}>

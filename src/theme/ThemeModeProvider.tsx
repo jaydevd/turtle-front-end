@@ -2,10 +2,12 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from '@mui/material/styles';
+import { useResolvedMode } from './useAppScheme';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 const STORAGE_KEY = 'habit-tracker-theme-mode';
+const DEFAULT_MODE: ThemeMode = 'dark';
 
 interface ThemeModeContextValue {
   /** What the user picked, including `system`. */
@@ -19,15 +21,15 @@ interface ThemeModeContextValue {
 const ThemeModeContext = createContext<ThemeModeContextValue | null>(null);
 
 function readStoredPreference(): ThemeMode {
-  if (typeof window === 'undefined') return 'system';
+  if (typeof window === 'undefined') return DEFAULT_MODE;
   const stored = window.localStorage.getItem(STORAGE_KEY);
   return stored === 'light' || stored === 'dark' || stored === 'system'
     ? stored
-    : 'system';
+    : DEFAULT_MODE;
 }
 
 export function ThemeModeProvider({ children }: { children: React.ReactNode }) {
-  const { mode, setMode } = useColorScheme();
+  const { setMode } = useColorScheme();
   // The stored choice is read lazily and never reaches the markup, so the
   // server render and the first client render stay identical. MUI is told the
   // preference in the effect below, after hydration.
@@ -42,7 +44,9 @@ export function ThemeModeProvider({ children }: { children: React.ReactNode }) {
     window.localStorage.setItem(STORAGE_KEY, next);
   }, []);
 
-  const resolvedMode: 'light' | 'dark' = mode === 'dark' ? 'dark' : 'light';
+  // Derived from the resolved scheme rather than the preference, so `system`
+  // reports the same light/dark the stylesheet is actually using.
+  const resolvedMode = useResolvedMode();
 
   const toggle = useCallback(() => {
     setPreference(resolvedMode === 'dark' ? 'light' : 'dark');

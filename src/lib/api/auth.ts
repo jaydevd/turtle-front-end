@@ -60,6 +60,30 @@ export const authApi = {
   },
 
   /**
+   * Asks the backend to email a reset link to an address.
+   *
+   * Always resolves, whether or not the address has an account: the backend
+   * deliberately answers the same way either way, so the client cannot reveal
+   * which emails are registered.
+   */
+  async requestPasswordReset(email: string): Promise<void> {
+    await api.post('/user/auth/password-reset/', { email: email.trim().toLowerCase() });
+  },
+
+  /**
+   * Spends the uid/token pair from a reset link and installs the new password.
+   * Throws a validation error when the link is invalid or expired, or when the
+   * new password fails the shared strength rules.
+   */
+  async confirmPasswordReset(input: {
+    uid: string;
+    token: string;
+    new_password: string;
+  }): Promise<void> {
+    await api.post('/user/auth/password-reset/confirm/', input);
+  },
+
+  /**
    * Starts connecting Google to the signed-in account and returns the URL to
    * send the browser to.
    *

@@ -1,7 +1,6 @@
 import type { ColorSystemOptions, CssVarsTheme } from '@mui/material/styles';
 import { alpha, extendTheme } from '@mui/material/styles';
-import { motion, radii, schemeTokens } from './tokens';
-import { buildTypography } from './typography';
+import { DEFAULT_SCHEME, motion, radii, schemeTokens } from './tokens';import { buildTypography } from './typography';
 
 export interface ThemeFonts {
   display: string;
@@ -34,7 +33,7 @@ export function createAppTheme(fonts: ThemeFonts): CssVarsTheme {
     // 'media' selector keys off the OS only, which would silently ignore an
     // explicit light/dark choice made in Settings.
     colorSchemeSelector: 'data-mui-color-scheme',
-    defaultColorScheme: 'light',
+    defaultColorScheme: DEFAULT_SCHEME,
     shape: { borderRadius: radii.md },
     spacing: 8,
     typography: buildTypography(fonts),

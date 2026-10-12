@@ -2,7 +2,13 @@
 
 import { useMemo } from 'react';
 import { useColorScheme } from '@mui/material/styles';
-import { habitSwatches, schemeTokens, type AppColors, type ColorSchemeName } from './tokens';
+import {
+  DEFAULT_SCHEME,
+  habitSwatches,
+  schemeTokens,
+  type AppColors,
+  type ColorSchemeName,
+} from './tokens';
 
 export interface AppShadows {
   card: string;
@@ -36,13 +42,29 @@ const swatchByHex = new Map<string, (typeof habitSwatches)[number]>(
 );
 
 /**
+ * The scheme actually painted on screen. `useColorScheme().mode` reports the
+ * user's *preference* and can still read `'system'` after the OS preference has
+ * been resolved, so it must not be used on its own. `colorScheme` is the
+ * resolved name MUI uses for the stylesheet; the `systemMode` fallback covers
+ * the first hydration pass before that value lands.
+ */
+export function useResolvedMode(): ColorSchemeName {
+  const { mode, systemMode, colorScheme } = useColorScheme();
+  if (colorScheme === 'light' || colorScheme === 'dark') return colorScheme;
+  if (mode === 'light' || mode === 'dark') return mode;
+  if (mode === 'system' && (systemMode === 'light' || systemMode === 'dark')) {
+    return systemMode;
+  }
+  return DEFAULT_SCHEME;
+}
+
+/**
  * Semantic tokens that sit outside the MUI palette (canvas, hairlines, warm
  * shadows). Reading them through the hook keeps every consumer automatically
  * correct in both schemes.
  */
 export function useAppScheme(): AppScheme {
-  const { mode } = useColorScheme();
-  const resolved: ColorSchemeName = mode === 'dark' ? 'dark' : 'light';
+  const resolved = useResolvedMode();
   const tokens = schemeTokens[resolved];
 
   return useMemo<AppScheme>(

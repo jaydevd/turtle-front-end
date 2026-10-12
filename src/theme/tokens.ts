@@ -8,6 +8,13 @@
 
 export type ColorSchemeName = 'light' | 'dark';
 
+/**
+ * The scheme the interface starts in before the user picks their own. Dark is
+ * the intended out-of-the-box look, so both the pre-paint script and the
+ * provider fall back to it rather than to the OS preference.
+ */
+export const DEFAULT_SCHEME: ColorSchemeName = 'dark';
+
 export const radii = {
   xs: 6,
   sm: 10,

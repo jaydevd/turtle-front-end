@@ -1,10 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { Alert, Box, Button, Stack, Typography } from '@mui/material';
 import GroupsOutlined from '@mui/icons-material/GroupsOutlined';
-import MarkEmailReadOutlined from '@mui/icons-material/MarkEmailReadOutlined';
 import {
   EmptyState,
   ErrorState,
@@ -14,7 +12,6 @@ import {
 } from '@/components/ui/surfaces';
 import { FormDialog } from '@/components/ui/dialogs';
 import { Field } from '@/components/ui/inputs';
-import { InvitationStatusPill } from '@/components/ui/pills';
 import { GroupCard } from '@/components/groups/GroupCard';
 import { useToast } from '@/components/feedback/ToastProvider';
 import { errorMessage, isApiError } from '@/lib/api/client';
@@ -22,7 +19,6 @@ import { formatRelative } from '@/lib/date';
 import {
   useCreateGroup,
   useGroups,
-  useMyInvitations,
   useMyJoinRequests,
   useRespondToJoinRequest,
 } from '@/lib/query/hooks';
@@ -34,7 +30,6 @@ export function GroupsView() {
   const { toast } = useToast();
 
   const groups = useGroups();
-  const invitations = useMyInvitations();
   const joinRequests = useMyJoinRequests('incoming');
   const createGroup = useCreateGroup();
   const respondToRequest = useRespondToJoinRequest();
@@ -47,13 +42,11 @@ export function GroupsView() {
   const [error, setError] = useState<unknown>(null);
 
   const list = groups.data?.results ?? [];
-  const pendingInvitations = (invitations.data?.results ?? []).filter(
-    (invitation) => invitation.status === 'pending',
-  );
   /**
    * A request addressed to the caller. They are not in the group yet, so this
    * inbox is the only place it can surface - the group itself will not appear in
-   * `list` until they accept.
+   * `list` until they accept. An invitation aimed at their address becomes one of
+   * these the moment they register, so the same list covers both ways in.
    */
   const pendingRequests = (joinRequests.data?.results ?? []).filter(
     (request) => request.status === 'pending',
@@ -173,45 +166,6 @@ export function GroupsView() {
           </Section>
         ) : null}
 
-        {pendingInvitations.length > 0 ? (
-          <Section
-            title="Waiting for you"
-            description="Somebody invited you to a group. Accepting joins you straight away."
-          >
-            <Stack spacing={1}>
-              {pendingInvitations.slice(0, 3).map((invitation) => (
-                <Stack
-                  key={invitation.id}
-                  direction="row"
-                  spacing={1.5}
-                  sx={{ alignItems: 'center' }}
-                >
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Stack
-                      direction="row"
-                      spacing={0.75}
-                      sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}
-                    >
-                      <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
-                        {invitation.group_name}
-                      </Typography>
-                      <InvitationStatusPill status={invitation.status} />
-                    </Stack>
-                    <Typography variant="caption" sx={{ color: colors.inkSoft }}>
-                      from {invitation.invited_by_email}
-                    </Typography>
-                  </Box>
-                  <Link href={`/invite?token=${invitation.token}`}>
-                    <Button size="small" color="inherit">
-                      Review
-                    </Button>
-                  </Link>
-                </Stack>
-              ))}
-            </Stack>
-          </Section>
-        ) : null}
-
         <Section
           title="Your groups"
           description="Groups you own and groups you have joined."
@@ -249,20 +203,6 @@ export function GroupsView() {
             </Box>
           )}
         </Section>
-
-        {pendingInvitations.length > 0 ? null : (
-          <Section
-            title="Invitations"
-            description="Nothing here means nobody is waiting on you."
-          >
-            <EmptyState
-              compact
-              icon={MarkEmailReadOutlined}
-              title="No invitations"
-              description="Invitations match on your email address. Register with the address that was invited, then the invitation appears here."
-            />
-          </Section>
-        )}
       </Stack>
 
       <FormDialog

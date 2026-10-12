@@ -164,14 +164,32 @@ export interface GroupJoinRequest {
   /** Always the caller on create, and read-only on every read. */
   from_user: string;
   from_user_email: string;
-  to_user: string;
+  /**
+   * The account the request names, or null while it is still addressed to an
+   * email that has no account. Registering with that email links the row.
+   */
+  to_user: string | null;
+  /** The address, resolved from `to_user` when linked and `to_email` when not. */
   to_user_email: string;
+  /** The invited address, populated only while `to_user` is null. */
+  to_email: string;
   status: JoinRequestStatus;
   message: string;
   /** Null until the recipient answers. */
   responded_at: number | null;
   created_at: number;
   updated_at: number;
+}
+
+/**
+ * One account returned by the composer's search-as-you-type. A hit becomes a
+ * join request; an empty result is what turns the composer into an invitation.
+ */
+export interface MemberLookupResult {
+  id: string;
+  email: string;
+  /** Full name when the account has one, otherwise the email. */
+  display_name: string;
 }
 
 export interface GroupInvitation {
@@ -181,7 +199,10 @@ export interface GroupInvitation {
   invited_by: string;
   invited_by_email: string;
   email: string;
-  /** The `/invite?token=` link. Server-minted and read-only. */
+  /**
+   * Server-minted and read-only. Invitation emails now point at sign-up rather
+   * than carrying this, but the token still claims the invitation outright.
+   */
   token: string;
   status: InvitationStatus;
   /** Epoch seconds, or null for an invitation that never expires. */
@@ -190,12 +211,6 @@ export interface GroupInvitation {
   responded_at: number | null;
   created_at: number;
   updated_at: number;
-}
-
-/** Result of claiming an invitation: both halves of the join in one payload. */
-export interface InvitationAcceptResult {
-  invitation: GroupInvitation;
-  membership: GroupMembership;
 }
 
 /* ------------------------------------------------------------------ */

@@ -9,6 +9,7 @@ import { ToastProvider } from '@/components/feedback/ToastProvider';
 import { AuthProvider } from '@/lib/auth/AuthContext';
 import { isApiError } from '@/lib/api/client';
 import { createAppTheme } from '@/theme/createAppTheme';
+import { DEFAULT_SCHEME } from '@/theme/tokens';
 
 const displayFont = 'var(--font-display), Georgia, "Times New Roman", serif';
 const sansFont = 'var(--font-sans), ui-sans-serif, system-ui, -apple-system, sans-serif';
@@ -45,7 +46,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
   return (
     <AppRouterCacheProvider options={{ key: 'habit-tracker' }}>
-      <CssVarsProvider theme={theme} defaultMode="light">
+      <CssVarsProvider theme={theme} defaultMode={DEFAULT_SCHEME}>
         <ThemeModeProvider>
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
